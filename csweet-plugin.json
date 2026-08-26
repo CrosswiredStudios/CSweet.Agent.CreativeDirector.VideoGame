@@ -1,0 +1,111 @@
+{
+  "$schema": "https://raw.githubusercontent.com/CrosswiredStudios/CSweetAgentSdk/main/schemas/csweet-plugin.v2.schema.json",
+  "manifestVersion": "2.0",
+  "kind": "agent",
+  "rolePolicy": {
+    "profile": "manager.v1",
+    "declaredRoleKeys": ["creative-director"],
+    "specializationKeys": ["video-game-development", "game-creative-direction"]
+  },
+  "id": "com.csweet.video-game-creative-director",
+  "name": "C-Sweet Video Game Creative Director",
+  "version": "0.1.0",
+  "publisher": { "id": "com.csweet", "name": "C-Sweet" },
+  "runtime": {
+    "type": "dotnet-project",
+    "projectPath": "src/CSweet.Agent.CreativeDirector.VideoGame/CSweet.Agent.CreativeDirector.VideoGame.csproj",
+    "targetFramework": "net10.0",
+    "defaultActivationMode": "AlwaysOn",
+    "defaultTickFrequencySeconds": 300,
+    "supportsMultipleInstallations": true,
+    "maximumConcurrentJobs": 1
+  },
+  "protocol": { "minimumVersion": "2.0", "maximumVersion": "2.x" },
+  "provides": [
+    {
+      "name": "creative-direction.game-vision.v1",
+      "description": "Read the durable video-game creative-direction lifecycle and accepted vision status.",
+      "inputSchema": { "type": "object", "additionalProperties": false },
+      "outputSchema": { "type": "object" },
+      "executionTimeoutSeconds": 30,
+      "idempotency": "none",
+      "riskClass": "standard"
+    },
+    {
+      "name": "management.check-in.v1",
+      "description": "Return a management status report for video-game creative direction.",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" },
+      "executionTimeoutSeconds": 30,
+      "idempotency": "work-item",
+      "riskClass": "standard"
+    },
+    {
+      "name": "agent.configuration.describe.v1",
+      "description": "Describe Video Game Creative Director configuration.",
+      "inputSchema": { "type": "object", "additionalProperties": false },
+      "outputSchema": { "type": "object" },
+      "executionTimeoutSeconds": 30,
+      "idempotency": "none",
+      "riskClass": "standard"
+    },
+    {
+      "name": "agent.configuration.update.v1",
+      "description": "Update Video Game Creative Director configuration.",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" },
+      "executionTimeoutSeconds": 30,
+      "idempotency": "work-item",
+      "riskClass": "standard"
+    }
+  ],
+  "requires": [
+    { "name": "platform.llm.chat-stream.v1", "scope": "organization", "purpose": "Generate and refine grounded video-game pitches and answer creative questions." },
+    { "name": "platform.user-input.request.v1", "scope": "organization", "purpose": "Request one bounded intake, pitch, or creative decision from the authoritative manager." },
+    { "name": "communication.chat.read.v1", "scope": "team", "purpose": "Read authorized manager and reporting-tree conversations including sanitized attachment references." },
+    { "name": "communication.chat.create.v1", "scope": "team", "purpose": "Open or reuse direct conversations with the authoritative manager or Product Manager." },
+    { "name": "communication.message.send.v1", "scope": "team", "purpose": "Send milestone, blocker, escalation, relay, and handoff messages." },
+    { "name": "communication.coordination.start.v1", "scope": "team", "purpose": "Start the authenticated exact-digest game-vision handoff to the Product Manager." },
+    { "name": "communication.coordination.respond.v1", "scope": "team", "purpose": "Answer reporting-tree creative questions and complete the vision acknowledgement." },
+    { "name": "communication.coordination.read.v1", "scope": "team", "purpose": "Recover the durable Product Manager handoff session." },
+    { "name": "communication.coordination.list.v1", "scope": "team", "purpose": "Reconcile the Creative Director's own handoff and clarification sessions." },
+    { "name": "platform.team-roster.read.v1", "scope": "team", "purpose": "Verify an active eligible Product Manager direct report without sourcing candidates." },
+    { "name": "platform.management.resource-change.propose.v1", "scope": "organization", "purpose": "Submit one Product Manager staffing plan to the authoritative manager for approval." },
+    { "name": "platform.management.resource-change.read.v1", "scope": "organization", "purpose": "Wait for and reconcile the Product Manager staffing decision." },
+    { "name": "platform.management.staffing-replenishment.propose.v1", "scope": "team", "purpose": "Request governed replenishment if the approved Product Manager later becomes unavailable." },
+    { "name": "platform.management.staffing-replenishment.read.v1", "scope": "team", "purpose": "Reconcile Product Manager replenishment decisions." },
+    { "name": "platform.agent-operating-state.read.v1", "scope": "organization", "purpose": "Recover the durable revision-safe creative lifecycle." },
+    { "name": "platform.agent-operating-state.write.v1", "scope": "organization", "purpose": "Persist proposals, accepted vision, staffing, handoff, reports, escalations, and notification fingerprints." },
+    { "name": "platform.management.status-report.v1", "scope": "organization", "purpose": "Deliver attributed daily reports to the authoritative manager." }
+  ],
+  "events": {
+    "subscribes": [
+      "com.csweet.user.message.received.v1",
+      "com.csweet.agent.coordination.turn-requested.v1",
+      "com.csweet.agent.attention.review-due.v1",
+      "com.csweet.management.review.due.v1",
+      "com.csweet.management.status.reported.v1",
+      "com.csweet.management.resource-change.decided.v1",
+      "com.csweet.management.staffing-replenishment.decided.v1",
+      "com.csweet.workforce.changed.v1",
+      "com.csweet.hiring-recommendation.fulfilled.v1"
+    ]
+  },
+  "configuration": [
+    { "key": "llmProviderId", "type": "provider", "label": "LLM provider", "required": true, "secret": false, "description": "Brokered model provider for creative work." },
+    { "key": "llmModel", "type": "model", "label": "Model", "required": true, "secret": false, "description": "A multimodal-capable model is recommended.", "dependsOnFieldKey": "llmProviderId" }
+  ],
+  "credentials": [],
+  "webAccess": { "mode": "None", "rules": [] },
+  "ui": [],
+  "catalog": {
+    "summary": "Leads video-game vision from minimal discovery through iterative pitch approval, Product Manager handoff, and creative oversight.",
+    "category": "Creative",
+    "role": { "key": "video-game-creative-director", "name": "Video Game Creative Director" },
+    "license": { "spdxId": "MIT" },
+    "iconUrls": [],
+    "roleAliases": ["Game Director", "Video Game Creative Lead"],
+    "keywords": ["video games", "game design", "creative direction", "game vision"],
+    "documentationUrl": "README.md"
+  }
+}

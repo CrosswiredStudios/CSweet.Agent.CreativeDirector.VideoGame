@@ -1,0 +1,28 @@
+{
+  "suite": "video-game-creative-director.lifecycle.v1",
+  "version": "1.0",
+  "scenarios": [
+    {
+      "id": "sparse-direction-to-oversight",
+      "steps": [
+        "manager supplies sparse direction and chooses use-current-context",
+        "manager attaches concept art and a Markdown design note",
+        "agent produces a reference-grounded complete pitch with exact revision decision",
+        "manager refines once and rejects once; agent preserves positive constraints and asks a targeted choice",
+        "manager accepts the latest exact digest",
+        "agent submits exactly one Product Manager request and waits for approval and fulfillment",
+        "agent sends creative-direction.game-vision-brief.v1 to the active matching direct report",
+        "Product Manager returns product-management.game-vision-acknowledgement.v1 for the exact digest without blockers",
+        "a descendant asks a creative question and receives a direct answer",
+        "a descendant asks an executive question; agent escalates once and relays the answer",
+        "agent reports daily and emits no unchanged-state chatter"
+      ],
+      "assertions": [
+        "no candidate sourcing, installation, spending, web, or filesystem authority is used",
+        "all accepted and acknowledged digests match",
+        "no lifecycle phase is skipped",
+        "material milestones and blockers are messaged once"
+      ]
+    }
+  ]
+}
