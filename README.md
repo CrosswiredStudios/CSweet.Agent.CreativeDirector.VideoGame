@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `0.2.0`
+- Version: `0.2.1`
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`
@@ -23,9 +23,11 @@ source, install, spend, or claim that hiring is complete.
 
 `Discovery → PitchReview → VisionAccepted → PMPlanPending → PMHiringPending → VisionHandoff → Oversight`
 
-Onboarding proactively asks the manager to choose delegated decisions, milestone review, or close
-collaboration and invites platform, genre, story-participation, and reference constraints. It does
-not submit staffing until the manager replies. PNG, JPEG, WebP, PDF, UTF-8 text, and Markdown
+Onboarding invites starting context and references without embedding a plain-text question. On the
+manager's first turn, the agent uses the platform's structured multiple-choice tool to choose
+delegated decisions, milestone review, or close collaboration. Manager decisions use 2–4 concrete
+options with one recommendation instead of open-ended questions whenever an active chat turn is
+available. The agent does not submit staffing until that choice is recorded. PNG, JPEG, WebP, PDF, UTF-8 text, and Markdown
 references are passed to the configured model through opaque, broker-validated media references;
 operating state and memory retain metadata and digests only, never raw files or private paths.
 
