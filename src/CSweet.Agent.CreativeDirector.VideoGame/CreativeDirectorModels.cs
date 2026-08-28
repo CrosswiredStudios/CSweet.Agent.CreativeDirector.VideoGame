@@ -13,6 +13,29 @@ public enum CreativeDirectorPhase
     Oversight
 }
 
+public enum ManagerInvolvementMode
+{
+    Unspecified,
+    Delegated,
+    MilestoneReview,
+    Collaborative
+}
+
+public sealed record ManagerPreferenceProfile
+{
+    public ManagerInvolvementMode InvolvementMode { get; init; } = ManagerInvolvementMode.Unspecified;
+    public bool InvolvementWasExplicit { get; init; }
+    public int InvolvementEvidenceCount { get; init; }
+    public IReadOnlyList<string> PlatformConstraints { get; init; } = [];
+    public IReadOnlyList<string> GenreConstraints { get; init; } = [];
+    public IReadOnlyList<string> NarrativeConstraints { get; init; } = [];
+    public string? StoryParticipation { get; init; }
+    public string? ApprovalPreference { get; init; }
+    public IReadOnlyList<string> ReferenceGuidance { get; init; } = [];
+    public IReadOnlyList<Guid> SupportingMessageIds { get; init; } = [];
+    public DateTimeOffset? UpdatedAt { get; init; }
+}
+
 public sealed record GamePitchRevision(
     int Revision,
     string Markdown,
@@ -52,6 +75,9 @@ public sealed record CreativeDirectorOperatingState
 {
     public CreativeDirectorPhase Phase { get; init; } = CreativeDirectorPhase.Discovery;
     public bool IntakeChoiceAsked { get; init; }
+    public Guid? OnboardingEventId { get; init; }
+    public DateTimeOffset? OnboardingCompletedAt { get; init; }
+    public ManagerPreferenceProfile ManagerPreferences { get; init; } = new();
     public IReadOnlyList<string> DiscoveryInputs { get; init; } = [];
     public IReadOnlyList<GamePitchRevision> Proposals { get; init; } = [];
     public AcceptedGameVision? AcceptedVision { get; init; }

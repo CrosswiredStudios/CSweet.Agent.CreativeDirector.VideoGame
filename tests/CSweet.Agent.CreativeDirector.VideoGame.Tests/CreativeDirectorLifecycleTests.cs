@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CSweet.Agent.SDK;
+using CSweet.Memory;
 
 namespace CSweet.Agent.CreativeDirector.VideoGame.Tests;
 
@@ -128,5 +129,102 @@ public sealed class CreativeDirectorLifecycleTests
         Assert.Equal(CreativeDirectorPhase.Discovery, state.Phase);
         Assert.Contains("clockwork city", Assert.Single(state.DiscoveryInputs), StringComparison.OrdinalIgnoreCase);
         Assert.Equal(attachmentId, Assert.Single(state.References).AttachmentId);
+    }
+
+    [Theory]
+    [InlineData("Delegate unspecified decisions to you.", ManagerInvolvementMode.Delegated)]
+    [InlineData("I want to review major milestones.", ManagerInvolvementMode.MilestoneReview)]
+    [InlineData("Let's collaborate closely.", ManagerInvolvementMode.Collaborative)]
+    public void InvolvementCalibrationRecognizesAllLifecycleModes(
+        string message,
+        ManagerInvolvementMode expected) =>
+        Assert.Equal(expected, VideoGameCreativeDirectorAgent.ParseInvolvementMode(message));
+
+    [Theory]
+    [InlineData(ManagerInvolvementMode.Delegated, "LockAndStaff")]
+    [InlineData(ManagerInvolvementMode.MilestoneReview, "AwaitExplicitMilestoneApproval")]
+    [InlineData(ManagerInvolvementMode.Collaborative, "IterateCollaboratively")]
+    public void InvolvementModeSelectsIntendedVisionApprovalPath(
+        ManagerInvolvementMode mode,
+        string expected) =>
+        Assert.Equal(expected, VideoGameCreativeDirectorAgent.InitialVisionDisposition(mode));
+
+    [Fact]
+    public void ManagerPreferencesPersistExplicitConstraintsAndEvidence()
+    {
+        var messageId = Guid.NewGuid();
+        var preferences = VideoGameCreativeDirectorAgent.UpdateManagerPreferences(
+            new ManagerPreferenceProfile(),
+            "Delegate decisions. Target PC and Steam for a cooperative strategy game. I do not want to be involved in story decisions.",
+            messageId,
+            [],
+            applyDefault: true);
+
+        Assert.Equal(ManagerInvolvementMode.Delegated, preferences.InvolvementMode);
+        Assert.Contains("PC", preferences.PlatformConstraints);
+        Assert.Contains("Steam", preferences.PlatformConstraints);
+        Assert.Contains("strategy", preferences.GenreConstraints, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("Delegate story", preferences.StoryParticipation, StringComparison.Ordinal);
+        Assert.Contains(messageId, preferences.SupportingMessageIds);
+        Assert.NotNull(preferences.UpdatedAt);
+    }
+
+    [Fact]
+    public void PlatformParsingDoesNotMistakeConceptForPc()
+    {
+        var preferences = VideoGameCreativeDirectorAgent.UpdateManagerPreferences(
+            new ManagerPreferenceProfile(),
+            "Use the current concept and make autonomous creative recommendations.",
+            Guid.NewGuid(), [], applyDefault: true);
+
+        Assert.DoesNotContain("PC", preferences.PlatformConstraints);
+    }
+
+    [Fact]
+    public void ExplicitNarrativeDirectionIsProjectStateNotUserParticipation()
+    {
+        var preferences = VideoGameCreativeDirectorAgent.UpdateManagerPreferences(
+            new ManagerPreferenceProfile(),
+            "The story follows siblings restoring a flooded clockwork city.",
+            Guid.NewGuid(), [], applyDefault: true);
+
+        Assert.Null(preferences.StoryParticipation);
+        Assert.Contains(preferences.NarrativeConstraints,
+            x => x.Contains("clockwork city", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ExplicitMemoryProposalsUseUserAndBusinessScopesWithoutRawAttachmentNames()
+    {
+        var messageId = Guid.NewGuid();
+        var incoming = new CommunicationMessageReceivedEvent(
+            Guid.NewGuid(), Guid.NewGuid().ToString("D"), "manager-user",
+            "Collaborate closely on a PC RPG; I want to review the story.",
+            new Dictionary<string, string>(), Guid.NewGuid(), 1, messageId)
+        {
+            Attachments = [new CommunicationAttachment(
+                Guid.NewGuid(), messageId, "C:\\private\\concept.png", "image/png", 4096, new string('a', 64))]
+        };
+
+        var proposals = VideoGameCreativeDirectorAgent.BuildExplicitMemoryProposals(
+            incoming, Guid.NewGuid().ToString("D"), Guid.NewGuid().ToString("D"), Guid.NewGuid().ToString("D"));
+
+        Assert.Equal(2, proposals.Count);
+        Assert.Contains(proposals, x => x.Scope == MemoryScope.User && x.Sensitivity == MemorySensitivity.Personal);
+        Assert.Contains(proposals, x => x.Scope == MemoryScope.Tenant && x.Sensitivity == MemorySensitivity.Internal);
+        Assert.All(proposals, x => Assert.DoesNotContain("C:\\private", x.Content, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(proposals, x => x.Content.Contains(new string('a', 64), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ProductManagerPlanContainsOneDirectReportToCreativeDirector()
+    {
+        var creativeDirectorId = Guid.NewGuid();
+        var role = VideoGameCreativeDirectorAgent.BuildProductManagerRole(creativeDirectorId);
+
+        Assert.Equal("product-manager", role.RoleKey);
+        Assert.Equal(1, role.Headcount);
+        Assert.Equal(creativeDirectorId, role.ReportsToOrganizationUserId);
+        Assert.Equal(["product-management.plan.v1"], role.RequiredCapabilities);
     }
 }

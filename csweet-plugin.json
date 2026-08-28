@@ -9,7 +9,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "C-Sweet Video Game Creative Director",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": { "id": "com.csweet", "name": "C-Sweet" },
   "runtime": {
     "type": "dotnet-project",
@@ -62,6 +62,14 @@
   "requires": [
     { "name": "platform.llm.chat-stream.v1", "scope": "organization", "purpose": "Generate and refine grounded video-game pitches and answer creative questions." },
     { "name": "platform.user-input.request.v1", "scope": "organization", "purpose": "Request one bounded intake, pitch, or creative decision from the authoritative manager." },
+    { "name": "platform.business-profile.read.v1", "scope": "organization", "purpose": "Ground creative direction in the authoritative business profile." },
+    { "name": "platform.finance-profile.read.v1", "scope": "organization", "purpose": "Ground creative scope and staffing in authoritative financial constraints." },
+    { "name": "platform.organization.snapshot.read.v1", "scope": "organization", "purpose": "Ground creative and product leadership in current organization and workstream ownership." },
+    { "name": "memory.user.read.v1", "scope": "user", "purpose": "Recall approved manager interaction and involvement preferences." },
+    { "name": "memory.user.propose.v1", "scope": "user", "purpose": "Propose explicit manager interaction and involvement preferences." },
+    { "name": "memory.business.read.v1", "scope": "organization", "purpose": "Recall approved game-project decisions and creative references." },
+    { "name": "memory.business.propose.v1", "scope": "organization", "purpose": "Propose explicit platform, genre, narrative, and creative-reference decisions." },
+    { "name": "agent.onboarding.complete.v1", "scope": "organization", "purpose": "Durably complete the proactive manager-involvement onboarding event." },
     { "name": "communication.chat.read.v1", "scope": "team", "purpose": "Read authorized manager and reporting-tree conversations including sanitized attachment references." },
     { "name": "communication.chat.create.v1", "scope": "team", "purpose": "Open or reuse direct conversations with the authoritative manager or Product Manager." },
     { "name": "communication.message.send.v1", "scope": "team", "purpose": "Send milestone, blocker, escalation, relay, and handoff messages." },
@@ -81,6 +89,7 @@
   "events": {
     "subscribes": [
       "com.csweet.user.message.received.v1",
+      "com.csweet.agent.onboarded.v1",
       "com.csweet.agent.coordination.turn-requested.v1",
       "com.csweet.agent.attention.review-due.v1",
       "com.csweet.management.review.due.v1",
@@ -99,7 +108,7 @@
   "webAccess": { "mode": "None", "rules": [] },
   "ui": [],
   "catalog": {
-    "summary": "Leads video-game vision from minimal discovery through iterative pitch approval, Product Manager handoff, and creative oversight.",
+    "summary": "Calibrates manager involvement, owns video-game vision and initial product leadership, then hires a direct-report Product Manager through governed approval.",
     "category": "Creative",
     "role": { "key": "video-game-creative-director", "name": "Video Game Creative Director" },
     "license": { "spdxId": "MIT" },

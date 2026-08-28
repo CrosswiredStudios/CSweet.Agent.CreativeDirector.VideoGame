@@ -21,6 +21,15 @@ public sealed class ManifestTests
         Assert.Equal(["creative-director"], manifest.RolePolicy.DeclaredRoleKeys);
         Assert.Equal(["video-game-development", "game-creative-direction"], manifest.RolePolicy.SpecializationKeys);
         Assert.Equal("AlwaysOn", manifest.Runtime.DefaultActivationMode);
+        Assert.Contains(manifest.Requires, x => x.Name == PlatformCapabilities.BusinessProfileRead);
+        Assert.Contains(manifest.Requires, x => x.Name == PlatformCapabilities.FinanceProfileRead);
+        Assert.Contains(manifest.Requires, x => x.Name == PlatformCapabilities.OrganizationSnapshotRead);
+        Assert.Contains(manifest.Requires, x => x.Name == MemoryCapabilities.UserRead);
+        Assert.Contains(manifest.Requires, x => x.Name == MemoryCapabilities.UserPropose);
+        Assert.Contains(manifest.Requires, x => x.Name == MemoryCapabilities.BusinessRead);
+        Assert.Contains(manifest.Requires, x => x.Name == MemoryCapabilities.BusinessPropose);
+        Assert.Contains(manifest.Requires, x => x.Name == AgentLifecycleCapabilities.CompleteOnboarding);
+        Assert.Contains(AgentLifecycleEvents.Onboarded, manifest.Events.Subscribes);
         Assert.Empty(manifest.Credentials);
         Assert.Equal("None", manifest.WebAccess.Mode);
         Assert.True(File.Exists(Path.Combine(

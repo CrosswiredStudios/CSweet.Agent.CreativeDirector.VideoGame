@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `0.1.0`
+- Version: `0.2.0`
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`
@@ -23,13 +23,23 @@ source, install, spend, or claim that hiring is complete.
 
 `Discovery → PitchReview → VisionAccepted → PMPlanPending → PMHiringPending → VisionHandoff → Oversight`
 
-Discovery starts with one structured choice and asks only for missing video-game inputs. PNG, JPEG,
-WebP, PDF, UTF-8 text, and Markdown references are passed to the configured model through opaque,
-broker-validated media references; agent VMs never receive storage paths or raw storage credentials.
+Onboarding proactively asks the manager to choose delegated decisions, milestone review, or close
+collaboration and invites platform, genre, story-participation, and reference constraints. It does
+not submit staffing until the manager replies. PNG, JPEG, WebP, PDF, UTF-8 text, and Markdown
+references are passed to the configured model through opaque, broker-validated media references;
+operating state and memory retain metadata and digests only, never raw files or private paths.
+
+Delegated mode lets the Creative Director lock the initial vision and submit the PM plan on the
+manager's first substantive turn. Milestone-review mode preserves explicit Accept/Refine/Replace.
+Collaborative mode supports iterative refinement until the manager locks an exact revision. The
+authoritative operating state stores the involvement mode, platform/genre constraints, story and
+approval preferences, reference guidance, supporting message IDs, and update time.
 
 Every formal pitch is revisioned and digest-bound. Only the authoritative manager can accept the
-latest exact digest. After acceptance, the agent waits for approval and fulfillment of its Product
-Manager plan, hands that direct report a typed `creative-direction.game-vision-brief.v1` artifact,
+latest exact digest except in explicitly delegated mode, where the Creative Director locks the
+initial revision. The plan contains exactly one Product Manager reporting directly to the Creative
+Director. After separately approved hiring, the agent hands that report a typed
+`creative-direction.game-vision-brief.v1` artifact,
 and enters oversight only after an exact-digest, blocker-free
 `product-management.game-vision-acknowledgement.v1` response.
 
@@ -52,4 +62,9 @@ Keep `csweet-plugin.json` at the repository root. Import a reviewed GitHub commi
 clone this repository as an immediate child of C-Sweet's configured local agent catalog. Review
 the exact manifest, grants, activation mode, and source before approving installation.
 
-Built with `CSweet.Agent.SDK` 3.21.0.
+Creative work is grounded in authoritative business, finance, organization/team state, approved
+user/business memory, and supplied broker references. Explicit preferences and project decisions
+may be proposed to governed memory immediately; inferred persona preferences are not persisted
+from a single observation and remain subject to platform approval.
+
+Built with `CSweet.Agent.SDK` 3.22.0 and `CSweet.Memory` 0.1.2.
