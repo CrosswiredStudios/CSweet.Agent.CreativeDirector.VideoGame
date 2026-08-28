@@ -4,13 +4,17 @@ namespace CSweet.Agent.CreativeDirector.VideoGame;
 
 public enum CreativeDirectorPhase
 {
-    Discovery,
-    PitchReview,
-    VisionAccepted,
-    PMPlanPending,
-    PMHiringPending,
-    VisionHandoff,
-    Oversight
+    Discovery = 0,
+    InvolvementConfirmation = 1,
+    HighLevelGddWork = 2,
+    HighLevelReview = 3,
+    HighLevelAccepted = 4,
+    PMPlanPending = 5,
+    PMHiringPending = 6,
+    DetailedDesign = 7,
+    PackageReview = 8,
+    DevelopmentReady = 9,
+    Oversight = 10
 }
 
 public enum ManagerInvolvementMode
@@ -81,6 +85,13 @@ public sealed record CreativeDirectorOperatingState
     public IReadOnlyList<string> DiscoveryInputs { get; init; } = [];
     public IReadOnlyList<GamePitchRevision> Proposals { get; init; } = [];
     public AcceptedGameVision? AcceptedVision { get; init; }
+    public Guid? VisionTodoId { get; init; }
+    public Guid? HighLevelArtifactId { get; init; }
+    public Guid? HighLevelLatestRevisionId { get; init; }
+    public Guid? HighLevelAcceptedRevisionId { get; init; }
+    public Guid? DetailedDesignPackageId { get; init; }
+    public Guid? NarrativeWorldArtifactId { get; init; }
+    public Guid? ArtAudioDirectionArtifactId { get; init; }
     public IReadOnlyList<ReferenceEvidence> References { get; init; } = [];
     public Guid? StaffingRequestId { get; init; }
     public Guid? ProductManagerEmployeeId { get; init; }
@@ -100,7 +111,11 @@ public sealed record GameVisionBrief(
     string MvpScopeAndNonGoals,
     IReadOnlyList<ReferenceEvidence> ReferenceSummaries,
     string SuccessCriteriaRisksAndAssumptions,
-    IReadOnlyList<string> OpenDecisions);
+    IReadOnlyList<string> OpenDecisions)
+{
+    public Guid? HighLevelGddArtifactId { get; init; }
+    public Guid? HighLevelGddAcceptedRevisionId { get; init; }
+}
 
 public sealed record GameVisionAcknowledgement(
     string AcceptedPitchDigest,

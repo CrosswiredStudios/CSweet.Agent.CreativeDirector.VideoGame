@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using CSweet.Agent.SDK;
+using CSweet.WorkManagement.Contracts;
 using CSweet.Memory;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
@@ -17,7 +19,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     private const string StateSchema = "com.csweet.video-game-creative-director.operating-state.v1";
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "0.2.1";
+    public override string Version => "0.3.0";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -48,6 +50,14 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
 
         if (string.Equals(message.EventType, AgentCoordinationEvents.TurnRequested, StringComparison.Ordinal))
             return;
+
+        if (string.Equals(message.EventType, ArtifactEvents.AccessDecision, StringComparison.Ordinal))
+        {
+            var decision = DeserializePayload<ArtifactAccessDecision>(message.Data);
+            if (decision?.Outcome == "Approved")
+                await ReconcileDetailedPackageAsync(context, cancellationToken);
+            return;
+        }
 
         if (string.Equals(message.EventType, ManagementEvents.ReviewDue, StringComparison.Ordinal))
         {
@@ -135,21 +145,22 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 var fingerprint = $"vision-handoff-acknowledged:{accepted.Digest}";
                 var isNewMilestone = !current.State.NotificationFingerprints.Contains(
                     fingerprint, StringComparer.Ordinal);
-                await SaveStateAsync(current.State with
+                var detailed = await EnsureCreativeDetailedDocumentsAsync(current.State with
                 {
-                    Phase = CreativeDirectorPhase.Oversight,
+                    Phase = CreativeDirectorPhase.DetailedDesign,
                     NotificationFingerprints = isNewMilestone
                         ? current.State.NotificationFingerprints.Append(fingerprint).TakeLast(100).ToList()
                         : current.State.NotificationFingerprints
-                },
+                }, context, cancellationToken);
+                await SaveStateAsync(detailed,
                     current.Revision, Guid.NewGuid(), $"handoff-ack:{accepted.Digest}", context, cancellationToken);
                 if (isNewMilestone && Guid.TryParse(context.Identity?.ManagerEmployeeId, out var milestoneManagerId))
                     await context.Platform.Communication.SendDirectMessageAsync(
                         milestoneManagerId,
-                        $"Milestone reached: the Product Manager acknowledged exact game-vision digest `{accepted.Digest}` without blockers. Creative Direction is now in oversight.",
+                        $"Milestone reached: the Product Manager acknowledged exact game-vision digest `{accepted.Digest}` without blockers. Detailed design is underway; production remains gated on the approved five-document package.",
                         $"creative-milestone:{fingerprint}", cancellationToken);
                 return AgentCoordinationTurnResult.Completed(
-                    "The exact accepted game vision is acknowledged. Proceed with product planning and escalate creative ambiguities to me.");
+                    "The exact accepted game vision is acknowledged. Creative Direction created its detailed-design documents; coordinate the Game Designer and five-document package before production.");
             }
         }
 
@@ -193,6 +204,74 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             "This question is outside Creative Direction and no authoritative manager is available for escalation.");
     }
 
+    private static async Task<CreativeDirectorOperatingState> EnsureCreativeDetailedDocumentsAsync(
+        CreativeDirectorOperatingState state, AgentRuntimeContext context, CancellationToken token)
+    {
+        if (!state.HighLevelArtifactId.HasValue) return state;
+        var highLevel = await context.Platform.Artifacts.GetAsync(state.HighLevelArtifactId.Value, token);
+        var accepted = highLevel.Revisions.SingleOrDefault(x => x.Id == highLevel.AcceptedRevisionId);
+        if (accepted is null) return state;
+        async Task<Guid> EnsureAsync(Guid? existingId, string title, string type, string body)
+        {
+            ArtifactDocument document = existingId.HasValue
+                ? await context.Platform.Artifacts.GetAsync(existingId.Value, token)
+                : await context.Platform.Artifacts.CreateAsync(new CreateArtifactDocument(
+                    title, body, type, $"creative-detailed:{accepted.Id:N}:{type}",
+                    OriginConversationId: state.AcceptedVision?.ConversationId), token);
+            var latest = document.Revisions.MaxBy(x => x.Number)!;
+            if (latest.Status == "Draft")
+                document = await context.Platform.Artifacts.SubmitAsync(new SubmitArtifactRevision(
+                    document.Id, latest.Id, $"creative-detailed-submit:{latest.Id:N}",
+                    state.AcceptedVision?.ConversationId,
+                    Guid.TryParse(context.Identity?.EmployeeId, out var reviewerId) ? reviewerId : null), token);
+            return document.Id;
+        }
+        var narrative = await EnsureAsync(state.NarrativeWorldArtifactId, "Narrative & World Bible",
+            "game-design.narrative-world.v1", $"""
+            # Narrative & World Bible
+
+            ## Approved vision baseline
+            {accepted.Content}
+
+            ## Premise, themes, and tone
+            Define the dramatic premise, thematic questions, emotional arc, humor boundaries, and tonal do/don't rules.
+
+            ## World model
+            Detail places, cultures, factions, history, rules of the fiction, terminology, and how world logic supports play.
+
+            ## Characters and narrative systems
+            Specify roles, motivations, relationships, arcs, dialogue principles, quest/story structures, reactivity, and failure continuity.
+
+            ## Content canon and production guidance
+            Establish canon tiers, naming conventions, content templates, representation principles, spoilers, risks, and open decisions.
+            """);
+        var art = await EnsureAsync(state.ArtAudioDirectionArtifactId, "Art & Audio Direction Bible",
+            "game-design.art-audio-direction.v1", $"""
+            # Art & Audio Direction Bible
+
+            ## Approved vision baseline
+            {accepted.Content}
+
+            ## Visual identity
+            Define shape language, composition, value, color, materials, lighting, camera, animation, effects, iconography, and readability rules.
+
+            ## Asset and content direction
+            Specify character, environment, prop, UI, cinematic, technical-art assumptions, representative benchmarks, exclusions, and consistency checks.
+
+            ## Audio identity
+            Define music pillars, sonic palette, ambience, interaction feedback, dialogue treatment, spatial behavior, dynamic mixing, and silence.
+
+            ## Accessibility and validation
+            Cover visual/audio alternatives, flashing and motion boundaries, subtitle support, review gates, risks, references, and open decisions.
+            """);
+        if (state.ProductManagerEmployeeId.HasValue)
+            await context.Platform.Communication.SendDirectMessageAsync(state.ProductManagerEmployeeId.Value,
+                $"Creative Direction documents are ready for exact-file collaboration: Narrative & World `{narrative:D}` and Art & Audio Direction `{art:D}`. Give these IDs to the assigned Game Designer so it can request human-approved per-file access; no folder, package, task, or chat grants access.",
+                $"creative-detailed-docs:{accepted.Id:N}", token);
+        return state with { NarrativeWorldArtifactId = narrative, ArtAudioDirectionArtifactId = art,
+            Phase = CreativeDirectorPhase.DetailedDesign };
+    }
+
     protected override async Task<AgentWorkResult> ExecuteCapabilityCoreAsync(
         AgentCapabilityRequest request,
         AgentRuntimeContext context,
@@ -202,7 +281,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         {
             return AgentWorkResult.Success(new
             {
-                lifecycle = "Discovery → PitchReview → VisionAccepted → PMPlanPending → PMHiringPending → VisionHandoff → Oversight",
+                lifecycle = "Discovery → InvolvementConfirmation → HighLevelGddWork → HighLevelReview → HighLevelAccepted → PMPlanPending → PMHiringPending → DetailedDesign → PackageReview → DevelopmentReady → Oversight",
                 stateKey = StateKey
             });
         }
@@ -231,6 +310,33 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         var state = current.State;
         var currentMessage = ExtractCurrentMessage(incoming.Message);
         var isManager = IsAuthoritativeManager(incoming, context.Identity);
+
+        if (!isManager && state.Phase is CreativeDirectorPhase.DetailedDesign or CreativeDirectorPhase.PackageReview &&
+            currentMessage.Contains("Detailed game-design package", StringComparison.OrdinalIgnoreCase))
+        {
+            var ids = Regex.Matches(currentMessage,
+                    "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+                .Select(x => Guid.Parse(x.Value)).Distinct().ToList();
+            if (ids.Count < 6)
+            {
+                await stream.WriteDraftAsync("Send the package ID and all five exact member artifact IDs. Package membership itself does not grant me document access.", cancellationToken);
+                return;
+            }
+            var packageId = ids[0];
+            foreach (var artifactId in ids.Skip(1).Take(5))
+            {
+                var own = artifactId == state.NarrativeWorldArtifactId || artifactId == state.ArtAudioDirectionArtifactId;
+                _ = await context.Platform.Artifacts.RequestAccessAsync(new RequestArtifactAccess(
+                    artifactId, own ? ["artifact.decide"] : ["artifact.read", "artifact.decide"],
+                    "Creative Direction needs explicitly approved exact-file authority to review this detailed package member.",
+                    $"creative-package-access:{packageId:N}:{artifactId:N}"), cancellationToken);
+            }
+            await SaveStateAsync(state with { DetailedDesignPackageId = packageId,
+                    Phase = CreativeDirectorPhase.PackageReview }, current.Revision, Guid.NewGuid(),
+                $"creative-package-received:{packageId:N}", context, cancellationToken);
+            await stream.WriteDraftAsync("I requested human approval for the exact per-file grants needed to review this package. Delegated creative authority does not bypass document security.", cancellationToken);
+            return;
+        }
 
         if (!isManager && state.Phase != CreativeDirectorPhase.Oversight)
         {
@@ -282,6 +388,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 state.ManagerPreferences, currentMessage, incoming.MessageId, incoming.Attachments, applyDefault: false);
             state = state with
             {
+                Phase = CreativeDirectorPhase.InvolvementConfirmation,
                 IntakeChoiceAsked = true,
                 ManagerPreferences = preferences,
                 DiscoveryInputs = state.DiscoveryInputs.Append(currentMessage).Where(x => !string.IsNullOrWhiteSpace(x))
@@ -297,7 +404,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             return;
         }
 
-        if (isManager && state.Phase is CreativeDirectorPhase.Discovery or CreativeDirectorPhase.PitchReview)
+        if (isManager && state.Phase is CreativeDirectorPhase.Discovery or CreativeDirectorPhase.InvolvementConfirmation or CreativeDirectorPhase.HighLevelReview)
         {
             var preferences = UpdateManagerPreferences(
                 state.ManagerPreferences, currentMessage, incoming.MessageId, incoming.Attachments, applyDefault: true);
@@ -312,15 +419,31 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             await ProposeExplicitMemoriesAsync(incoming, context, cancellationToken);
         }
 
-        if (state.Phase == CreativeDirectorPhase.PitchReview && IsVisionLock(currentMessage) && state.Proposals.Count > 0)
+        if (state.Phase == CreativeDirectorPhase.HighLevelReview && IsVisionLock(currentMessage) && state.Proposals.Count > 0)
         {
             var latest = state.Proposals.MaxBy(x => x.Revision)!;
+            if (state.HighLevelArtifactId.HasValue && state.HighLevelLatestRevisionId.HasValue)
+            {
+                try
+                {
+                    _ = await context.Platform.Artifacts.DecideAsync(new DecideArtifactRevision(
+                        state.HighLevelArtifactId.Value, state.HighLevelLatestRevisionId.Value,
+                        "accept", "Approved by the authoritative manager in chat.",
+                        $"vision-chat-approval:{incoming.MessageId:N}", incoming.MessageId), cancellationToken);
+                }
+                catch (PlatformCapabilityException exception)
+                {
+                    await stream.WriteDraftAsync($"I could not record the approval: {exception.Message}. Use the document Accept button or approve the pending exact-file access request.", cancellationToken);
+                    return;
+                }
+            }
             state = state with
             {
-                Phase = CreativeDirectorPhase.VisionAccepted,
+                Phase = CreativeDirectorPhase.HighLevelAccepted,
                 AcceptedVision = new AcceptedGameVision(
-                    latest.Revision, latest.Digest, latest.Markdown, conversationId,
+                    latest.Revision, latest.Digest, string.Empty, conversationId,
                     incoming.TurnId, incoming.MessageId, DateTimeOffset.UtcNow)
+                ,HighLevelAcceptedRevisionId = state.HighLevelLatestRevisionId
             };
             var saved = await SaveStateAsync(state, current.Revision, Guid.NewGuid(),
                 $"vision-accepted:{latest.Digest}", context, cancellationToken);
@@ -331,7 +454,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             return;
         }
 
-        if (state.Phase == CreativeDirectorPhase.PitchReview && IsExplicitRejection(currentMessage))
+        if (state.Phase == CreativeDirectorPhase.HighLevelReview && IsExplicitRejection(currentMessage))
         {
             _ = await context.Platform.AskUserAsync(new AskUserRequest(
                 conversationId, incoming.TurnId,
@@ -348,7 +471,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             return;
         }
 
-        if (state.Phase is CreativeDirectorPhase.Discovery or CreativeDirectorPhase.PitchReview)
+        if (state.Phase is CreativeDirectorPhase.Discovery or CreativeDirectorPhase.InvolvementConfirmation or CreativeDirectorPhase.HighLevelReview)
         {
             var references = state.References;
             var pitch = await GeneratePitchAsync(incoming, currentMessage, state,
@@ -364,14 +487,64 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             var formal = $"{pitch.Trim()}\n\n---\n{decisionLine}";
             var proposal = new GamePitchRevision(revision, formal, digest, DateTimeOffset.UtcNow,
                 ExtractPositiveConstraints(currentMessage), references.Select(x => x.Sha256).Distinct().ToList());
+            Guid? todoId = state.VisionTodoId;
+            if (!todoId.HasValue)
+            {
+                var todo = await context.Platform.PersonalTodo.AddAsync(new AddPersonalTodoItemRequest(
+                    "Build the high-level game design document",
+                    "Create, review, and accept the authoritative high-level GDD before product development.",
+                    "High", null, $"high-level-gdd:{conversationId:N}",
+                    SourceConversationId: conversationId, SourceMessageId: incoming.MessageId), cancellationToken);
+                todoId = todo.Id;
+            }
+            ArtifactDocument document;
+            if (!state.HighLevelArtifactId.HasValue)
+            {
+                document = await context.Platform.Artifacts.CreateAsync(new CreateArtifactDocument(
+                    "High-Level Game Design Document", formal, "game-design.high-level-gdd.v1",
+                    $"high-level-gdd-create:{conversationId:N}", OriginConversationId: conversationId), cancellationToken);
+            }
+            else
+            {
+                var draft = await context.Platform.Artifacts.ReviseAsync(new CreateArtifactRevision(
+                    state.HighLevelArtifactId.Value, state.HighLevelLatestRevisionId!.Value, formal,
+                    $"high-level-gdd-revision:{digest}"), cancellationToken);
+                document = await context.Platform.Artifacts.GetAsync(state.HighLevelArtifactId.Value, cancellationToken);
+            }
+            var latestArtifactRevision = document.Revisions.MaxBy(x => x.Number)!;
+            document = await context.Platform.Artifacts.SubmitAsync(new SubmitArtifactRevision(
+                document.Id, latestArtifactRevision.Id, $"high-level-gdd-submit:{latestArtifactRevision.Id:N}",
+                conversationId, Guid.TryParse(context.Identity?.EmployeeId, out var reviewerEmployeeId) ? reviewerEmployeeId : null), cancellationToken);
+            var artifactAccepted = false;
+            if (delegated)
+            {
+                try
+                {
+                    document = await context.Platform.Artifacts.DecideAsync(new DecideArtifactRevision(
+                        document.Id, latestArtifactRevision.Id, "accept", "Accepted under confirmed delegated creative authority.",
+                        $"high-level-gdd-delegated:{latestArtifactRevision.Id:N}"), cancellationToken);
+                    artifactAccepted = true;
+                }
+                catch (PlatformCapabilityException exception) when (exception.Code == PlatformCapabilityErrorCode.Denied)
+                {
+                    _ = await context.Platform.Artifacts.RequestAccessAsync(new RequestArtifactAccess(
+                        document.Id, ["artifact.decide"],
+                        "Delegated mode requires Creative Direction to accept the exact high-level GDD revision.",
+                        $"high-level-gdd-decide-access:{document.Id:N}"), cancellationToken);
+                }
+            }
             state = state with
             {
-                Phase = delegated ? CreativeDirectorPhase.VisionAccepted : CreativeDirectorPhase.PitchReview,
+                Phase = artifactAccepted ? CreativeDirectorPhase.HighLevelAccepted : CreativeDirectorPhase.HighLevelReview,
                 References = references,
                 Proposals = state.Proposals.Append(proposal).TakeLast(20).ToList(),
-                AcceptedVision = delegated
+                VisionTodoId = todoId,
+                HighLevelArtifactId = document.Id,
+                HighLevelLatestRevisionId = latestArtifactRevision.Id,
+                HighLevelAcceptedRevisionId = artifactAccepted ? latestArtifactRevision.Id : state.HighLevelAcceptedRevisionId,
+                AcceptedVision = artifactAccepted
                     ? new AcceptedGameVision(
-                        revision, digest, formal, conversationId,
+                        revision, digest, string.Empty, conversationId,
                         incoming.TurnId, incoming.MessageId, DateTimeOffset.UtcNow)
                     : state.AcceptedVision
             };
@@ -395,8 +568,8 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             }
             var saved = await SaveStateAsync(state, current.Revision, Guid.NewGuid(),
                 $"pitch-revision:{digest}", context, cancellationToken);
-            await stream.WriteDraftAsync(formal, cancellationToken);
-            if (delegated)
+            await stream.WriteDraftAsync($"{formal}\n\n[Open the live high-level GDD](/organizations/{context.BusinessId}/documents?artifact={document.Id:D})", cancellationToken);
+            if (artifactAccepted)
                 await ReconcileAsync(Guid.NewGuid(), context, cancellationToken, saved.State, saved.Revision);
             return;
         }
@@ -406,7 +579,9 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             {
                 CreativeDirectorPhase.PMPlanPending => "The Product Manager plan is awaiting the authoritative manager’s decision.",
                 CreativeDirectorPhase.PMHiringPending => "The Product Manager role is approved; C-Sweet’s governed hiring process has not yet produced an active matching direct report.",
-                CreativeDirectorPhase.VisionHandoff => "The accepted vision is in authenticated handoff to the Product Manager. I’m waiting for an exact-digest acknowledgement without blockers.",
+                CreativeDirectorPhase.DetailedDesign => "The accepted high-level GDD is in authenticated handoff. Product Management and Game Design must complete the five-document detailed package before production.",
+                CreativeDirectorPhase.PackageReview => "The detailed game-design package is awaiting its mode-aware final approval.",
+                CreativeDirectorPhase.DevelopmentReady => "The approved detailed design package is the production gate for the game team.",
                 _ => "The accepted game vision is in oversight. I’ll answer creative questions, report daily, and alert you only for material milestones, blockers, risks, or decisions."
             }, cancellationToken);
     }
@@ -676,6 +851,11 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         var state = current.Item1;
         var revision = current.Item2;
         if (state.AcceptedVision is null) return;
+        if (state.DetailedDesignPackageId.HasValue)
+        {
+            await ReconcileDetailedPackageAsync(context, cancellationToken);
+            return;
+        }
 
         if (state.StaffingRequestId is null)
         {
@@ -752,7 +932,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         state = state with
         {
             ProductManagerEmployeeId = pmEmployeeId,
-            Phase = CreativeDirectorPhase.VisionHandoff,
+            Phase = CreativeDirectorPhase.DetailedDesign,
             NotificationFingerprints = isNewPmMilestone
                 ? state.NotificationFingerprints.Append(pmMilestoneFingerprint).TakeLast(100).ToList()
                 : state.NotificationFingerprints
@@ -763,12 +943,16 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 state.AcceptedVision!.Digest,
                 "Deliver the player promise and measurable outcomes in the accepted pitch.",
                 "Use the accepted core loop and three creative pillars as product constraints.",
-                "Honor the accepted platforms and engine/stack recommendation unless an accountable technical role escalates a blocker.",
+                "Honor the accepted platforms, audience, session shape, genre, perspective, and controls; technical implementation choices remain with accountable technical roles.",
                 "Preserve the accepted art, narrative, audio, theme, and tone direction.",
                 "Plan only the accepted MVP; keep every explicit non-goal out of initial delivery.",
                 state.References,
                 "Use the pitch success criteria; track every named risk and assumption.",
-                []);
+                [])
+            {
+                HighLevelGddArtifactId = state.HighLevelArtifactId,
+                HighLevelGddAcceptedRevisionId = state.HighLevelAcceptedRevisionId
+            };
             var artifact = new AgentCoordinationArtifactSubmission(
                 VisionBriefArtifactType, "1.0", state.AcceptedVision.Digest, 1, true,
                 JsonSerializer.SerializeToElement(brief));
@@ -793,6 +977,54 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 superiorId,
                 $"Milestone reached: Product Manager `{pmEmployeeId:D}` is active and the exact-digest game-vision handoff has started.",
                 $"creative-milestone:{pmMilestoneFingerprint}", cancellationToken);
+    }
+
+    private async Task ReconcileDetailedPackageAsync(AgentRuntimeContext context, CancellationToken cancellationToken)
+    {
+        var current = await ReadStateAsync(context, cancellationToken);
+        var state = current.State;
+        if (!state.DetailedDesignPackageId.HasValue) return;
+        ArtifactPackage package;
+        try
+        {
+            package = await context.Platform.Artifacts.GetPackageAsync(state.DetailedDesignPackageId.Value,
+                cancellationToken);
+        }
+        catch (PlatformCapabilityException exception) when (exception.Code is PlatformCapabilityErrorCode.Denied or PlatformCapabilityErrorCode.NotFound)
+        {
+            return;
+        }
+
+        var mode = state.ManagerPreferences.InvolvementMode;
+        if (mode != ManagerInvolvementMode.Collaborative)
+        {
+            foreach (var member in package.Members)
+            {
+                var document = await context.Platform.Artifacts.GetAsync(member.ArtifactId, cancellationToken);
+                if (document.SubmittedRevisionId is Guid revisionId)
+                    _ = await context.Platform.Artifacts.DecideAsync(new DecideArtifactRevision(
+                        document.Id, revisionId, "accept", "Creative Direction internal package sign-off.",
+                        $"creative-package-member:{package.Id:N}:{revisionId:N}"), cancellationToken);
+            }
+        }
+
+        if (mode == ManagerInvolvementMode.Delegated)
+            package = await context.Platform.Artifacts.DecidePackageAsync(package.Id,
+                $"creative-package-accept:{package.Id:N}:{package.Version}", cancellationToken);
+
+        var approved = package.Status.Equals("Approved", StringComparison.OrdinalIgnoreCase);
+        var next = state with { Phase = approved ? CreativeDirectorPhase.DevelopmentReady : CreativeDirectorPhase.PackageReview };
+        await SaveStateAsync(next, current.Revision, Guid.NewGuid(),
+            $"creative-package-reconcile:{package.Id:N}:{package.Status}", context, cancellationToken);
+        var members = string.Join(", ", package.Members.OrderBy(x => x.Position).Select(x => $"`{x.ArtifactId:D}`"));
+        if (approved && state.ProductManagerEmployeeId.HasValue)
+            await context.Platform.Communication.SendDirectMessageAsync(state.ProductManagerEmployeeId.Value,
+                $"Approved detailed game-design package `{package.Id:D}` version {package.Version} is development-ready. Exact members: {members}. Build the DesignPackageDigest from these accepted revisions before any video-game production execution.",
+                $"creative-package-approved:{package.Id:N}:{package.Version}", cancellationToken);
+        else if (!approved && Guid.TryParse(context.Identity?.ManagerEmployeeId, out var managerId))
+            await context.Platform.Communication.SendDirectMessageAsync(managerId,
+                $"Detailed game-design package `{package.Id:D}` is ready for your milestone approval. Exact members: {members}. Open /organizations/{context.BusinessId}/documents?packageId={package.Id:D} to review it.",
+                $"creative-package-manager-review:{package.Id:N}:{package.Version}", cancellationToken);
     }
 
     internal static ResourceChangeRole BuildProductManagerRole(Guid creativeDirectorOrganizationUserId) =>
@@ -1113,12 +1345,12 @@ Produce one executive-readable game pitch in Markdown containing every heading b
 4. Core gameplay loop
 5. Theme, world, narrative premise, and tone
 6. Three creative pillars
-7. Recommended engine/stack with rationale
+7. Controls, UX, and accessibility direction
 8. MVP gameplay scope
-9. Explicit non-goals
+9. Explicit non-goals and business guardrails
 10. Art and audio direction
-11. Success criteria
-12. Risks and assumptions
+11. Success criteria and prototype hypotheses
+12. Risks, assumptions, and open decisions
 13. Reference-derived observations
 
 Do not invent claims about references you cannot perceive. Preserve positive constraints from earlier revisions, but when replacement is requested create a materially different premise. Do not include the Accept/Refine/Replace decision line; the runtime appends an exact-revision decision.

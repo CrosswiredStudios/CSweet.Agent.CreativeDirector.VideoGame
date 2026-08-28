@@ -70,11 +70,15 @@ public sealed class CreativeDirectorLifecycleTests
     {
         Assert.Equal([
             CreativeDirectorPhase.Discovery,
-            CreativeDirectorPhase.PitchReview,
-            CreativeDirectorPhase.VisionAccepted,
+            CreativeDirectorPhase.InvolvementConfirmation,
+            CreativeDirectorPhase.HighLevelGddWork,
+            CreativeDirectorPhase.HighLevelReview,
+            CreativeDirectorPhase.HighLevelAccepted,
             CreativeDirectorPhase.PMPlanPending,
             CreativeDirectorPhase.PMHiringPending,
-            CreativeDirectorPhase.VisionHandoff,
+            CreativeDirectorPhase.DetailedDesign,
+            CreativeDirectorPhase.PackageReview,
+            CreativeDirectorPhase.DevelopmentReady,
             CreativeDirectorPhase.Oversight
         ], Enum.GetValues<CreativeDirectorPhase>());
     }
