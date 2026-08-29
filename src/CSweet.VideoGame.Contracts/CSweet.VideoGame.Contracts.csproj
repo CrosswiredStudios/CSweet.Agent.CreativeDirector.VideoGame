@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <PackageId>CSweet.VideoGame.Contracts</PackageId>
+    <Version>1.0.0</Version>
+    <Description>Versioned vertical contracts for video-game production agents on C-Sweet.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\profiles\video-game-production.v2.json" Link="profiles\video-game-production.v2.json" Pack="true" PackagePath="profiles\" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,82 @@
+{
+  "key": "video-game-production.v2",
+  "version": 2,
+  "displayName": "Video Game Production",
+  "lifecyclePolicyKey": "video-game.lifecycle.v2",
+  "defaultBoardProfileKey": "video-game-production-board.v2",
+  "authorityPolicyKey": "video-game.authority.v1",
+  "metadataSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["workingTitle", "genre", "targetPlatforms", "playerAudience", "enginePreference", "contentRatingTarget", "creativePillars", "businessModel", "liveOperationsExpected", "onlineMultiplayerExpected", "accessibilityTargets", "localizationTargets"],
+    "properties": {
+      "workingTitle": { "type": "string" },
+      "genre": { "type": "string" },
+      "targetPlatforms": { "type": "array", "items": { "type": "string" } },
+      "playerAudience": { "type": "string" },
+      "enginePreference": { "type": "string" },
+      "contentRatingTarget": { "type": "string" },
+      "creativePillars": { "type": "array", "items": { "type": "string" } },
+      "businessModel": { "type": "string" },
+      "liveOperationsExpected": { "type": "boolean" },
+      "onlineMultiplayerExpected": { "type": "boolean" },
+      "accessibilityTargets": { "type": "array", "items": { "type": "string" } },
+      "localizationTargets": { "type": "array", "items": { "type": "string" } }
+    }
+  },
+  "lifecycle": {
+    "stages": [
+      { "key": "intake", "label": "Intake" },
+      { "key": "concept", "label": "Concept" },
+      { "key": "pre-production", "label": "Pre-production" },
+      { "key": "prototype", "label": "Prototype" },
+      { "key": "vertical-slice", "label": "Vertical Slice" },
+      { "key": "production", "label": "Production" },
+      { "key": "alpha", "label": "Alpha" },
+      { "key": "beta", "label": "Beta" },
+      { "key": "release-candidate", "label": "Release Candidate" },
+      { "key": "launch", "label": "Launch" },
+      { "key": "post-launch-stabilization", "label": "Post-launch Stabilization" },
+      { "key": "live-operations", "label": "Live Operations" },
+      { "key": "closure", "label": "Closure / Sunset" }
+    ],
+    "transitions": [
+      { "from": "intake", "to": "concept" },
+      { "from": "concept", "to": "pre-production" },
+      { "from": "pre-production", "to": "prototype" },
+      { "from": "prototype", "to": "vertical-slice" },
+      { "from": "vertical-slice", "to": "production" },
+      { "from": "production", "to": "alpha" },
+      { "from": "alpha", "to": "beta" },
+      { "from": "beta", "to": "release-candidate" },
+      { "from": "release-candidate", "to": "launch" },
+      { "from": "launch", "to": "post-launch-stabilization" },
+      { "from": "post-launch-stabilization", "to": "live-operations" },
+      { "from": "post-launch-stabilization", "to": "closure" },
+      { "from": "live-operations", "to": "closure" }
+    ]
+  },
+  "milestones": [
+    { "key": "vision-approved", "stage": "concept", "requiredEvidenceTypeKeys": ["video-game.vision.v1"], "requiredReviewerRoleKeys": ["creative-director", "game-producer"] },
+    { "key": "prototype-validated", "stage": "prototype", "requiredEvidenceTypeKeys": ["video-game.runnable-build.v1", "video-game.playtest.v1"], "requiredReviewerRoleKeys": ["game-technical-director", "game-quality-assurance", "creative-director"] },
+    { "key": "vertical-slice-approved", "stage": "vertical-slice", "requiredEvidenceTypeKeys": ["video-game.runnable-build.v1", "video-game.playtest.v1"], "requiredReviewerRoleKeys": ["creative-director", "game-producer", "game-technical-director", "game-quality-assurance"] },
+    { "key": "release-candidate-approved", "stage": "release-candidate", "requiredEvidenceTypeKeys": ["video-game.runnable-build.v1", "video-game.platform-certification.v1", "video-game.release-plan.v1"], "requiredReviewerRoleKeys": ["game-build-release-engineer", "game-quality-assurance", "creative-director", "game-producer"] },
+    { "key": "launch-approved", "stage": "launch", "requiredEvidenceTypeKeys": ["video-game.release-readiness.v1"], "requiredReviewerRoleKeys": ["human-owner"] }
+  ],
+  "workItemTypes": [
+    { "key": "video-game.milestone.v1", "displayName": "Game milestone", "kind": "Epic", "permittedParentTypeKeys": [], "requiredApprovalPolicyKeys": [] },
+    { "key": "video-game.feature.v1", "displayName": "Game feature", "kind": "Story", "permittedParentTypeKeys": ["video-game.milestone.v1"], "requiredApprovalPolicyKeys": [] },
+    { "key": "video-game.content.v1", "displayName": "Game content", "kind": "Story", "permittedParentTypeKeys": ["video-game.milestone.v1"], "requiredApprovalPolicyKeys": [] },
+    { "key": "video-game.task.v1", "displayName": "Game task", "kind": "Task", "permittedParentTypeKeys": ["video-game.milestone.v1", "video-game.feature.v1", "video-game.content.v1", "video-game.task.v1"], "requiredApprovalPolicyKeys": [] },
+    { "key": "video-game.bug.v1", "displayName": "Game bug", "kind": "Bug", "permittedParentTypeKeys": ["video-game.milestone.v1", "video-game.feature.v1", "video-game.content.v1", "video-game.task.v1"], "requiredApprovalPolicyKeys": [] },
+    { "key": "video-game.research-spike.v1", "displayName": "Game research / spike", "kind": "Task", "permittedParentTypeKeys": ["video-game.milestone.v1", "video-game.feature.v1", "video-game.content.v1"], "requiredApprovalPolicyKeys": [] },
+    { "key": "video-game.creative-review.v1", "displayName": "Game creative review", "kind": "Task", "permittedParentTypeKeys": ["video-game.milestone.v1", "video-game.feature.v1", "video-game.content.v1"], "requiredApprovalPolicyKeys": [] }
+  ],
+  "workflow": {
+    "states": ["ready", "in-progress", "discipline-review", "integrated-build", "qa-evaluation", "creative-review", "done"]
+  },
+  "staffing": {
+    "requiredRoleKeys": ["game-producer", "game-designer", "game-technical-director", "game-engineer", "game-quality-assurance", "playtest-researcher", "game-art-director", "game-artist", "technical-artist", "narrative-designer", "audio-designer", "level-designer", "game-ui-ux-accessibility-designer", "game-build-release-engineer"],
+    "conditionalRoleKeys": ["game-networking-engineer", "game-economy-designer", "game-localization-specialist", "game-security-privacy", "game-marketing-community", "game-platform-certification", "game-live-operations"]
+  }
+}

@@ -9,7 +9,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "C-Sweet Video Game Creative Director",
-  "version": "0.3.1",
+  "version": "1.0.0",
   "publisher": { "id": "com.csweet", "name": "C-Sweet" },
   "runtime": {
     "type": "dotnet-project",
@@ -18,9 +18,19 @@
     "defaultActivationMode": "AlwaysOn",
     "defaultTickFrequencySeconds": 300,
     "supportsMultipleInstallations": true,
-    "maximumConcurrentJobs": 1
+    "maximumConcurrentJobs": 4
   },
   "protocol": { "minimumVersion": "2.0", "maximumVersion": "2.x" },
+  "workstreamProfiles": {
+    "provides": [
+      {
+        "key": "video-game-production.v2",
+        "version": 2,
+        "definitionResource": "profiles/video-game-production.v2.json"
+      }
+    ],
+    "requires": []
+  },
   "provides": [
     {
       "name": "creative-direction.game-vision.v1",
@@ -65,6 +75,17 @@
     { "name": "platform.business-profile.read.v1", "scope": "organization", "purpose": "Ground creative direction in the authoritative business profile." },
     { "name": "platform.finance-profile.read.v1", "scope": "organization", "purpose": "Ground creative scope and staffing in authoritative financial constraints." },
     { "name": "platform.organization.snapshot.read.v1", "scope": "organization", "purpose": "Ground creative and product leadership in current organization and workstream ownership." },
+    { "name": "platform.workstream.read.v1", "scope": "organization", "purpose": "Read exact profile-bound project state and revisions." },
+    { "name": "platform.workstream.plan.propose.v2", "scope": "organization", "purpose": "Propose a game Workstream with accountable Producer, authority envelope, milestones, and gates." },
+    { "name": "platform.workstream.change.propose.v1", "scope": "organization", "purpose": "Propose revision-bound lifecycle, scope, budget, schedule, or metadata changes." },
+    { "name": "platform.workstream.gate.read.v1", "scope": "organization", "purpose": "Inspect profile-defined game lifecycle gates and exact evidence." },
+    { "name": "platform.workstream.gate.submit.v1", "scope": "organization", "purpose": "Submit profile-required creative, technical, QA, accessibility, build, and evaluation evidence." },
+    { "name": "platform.workstream.gate.decide.v1", "scope": "organization", "purpose": "Decide routine gates within the project authority envelope using structured findings." },
+    { "name": "platform.management.portfolio.read.v1", "scope": "organization", "purpose": "Supervise multiple concurrent game Workstreams without joining their delivery teams." },
+    { "name": "platform.team-roster.read.v2", "scope": "organization", "purpose": "Inspect each supervised project team's distinct installed specialists." },
+    { "name": "platform.decision.request.v1", "scope": "organization", "purpose": "Create one durable correlated escalation for each material project decision." },
+    { "name": "platform.decision.read.v1", "scope": "organization", "purpose": "Reconcile durable project decisions without phrase matching." },
+    { "name": "platform.decision.decide.v1", "scope": "organization", "purpose": "Make routine decisions explicitly authorized by the project authority envelope." },
     { "name": "memory.user.read.v1", "scope": "user", "purpose": "Recall approved manager interaction and involvement preferences." },
     { "name": "memory.user.propose.v1", "scope": "user", "purpose": "Propose explicit manager interaction and involvement preferences." },
     { "name": "memory.business.read.v1", "scope": "organization", "purpose": "Recall approved game-project decisions and creative references." },
@@ -89,10 +110,29 @@
     { "name": "platform.artifact.revise.v1", "scope": "organization", "purpose": "Create immutable revisions of exact granted game-design documents." },
     { "name": "platform.artifact.submit.v1", "scope": "organization", "purpose": "Submit exact game-design revisions for durable review." },
     { "name": "platform.artifact.decide.v1", "scope": "organization", "purpose": "Decide exact granted revisions under confirmed creative authority or record human chat evidence." },
+    { "name": "platform.artifact.decide.v2", "scope": "organization", "purpose": "Review exact document revisions and hashes against game rubrics with section findings and blocking severity." },
     { "name": "platform.artifact.request-access.v1", "scope": "organization", "purpose": "Request human approval for cross-agent access to explicitly listed documents." },
     { "name": "platform.artifact-package.read.v1", "scope": "organization", "purpose": "Review only a package whose member documents are individually granted." },
     { "name": "platform.artifact-package.decide.v1", "scope": "organization", "purpose": "Accept a complete detailed design package when exact-file decision grants exist." },
     { "name": "work.personal-todo.add.v1", "scope": "organization", "purpose": "Track the high-level GDD as durable personal work." },
+    { "name": "work.board.read", "scope": "organization", "purpose": "Inspect project-scoped boards and all accountable work." },
+    { "name": "work.board.create", "scope": "organization", "purpose": "Create the project board bound to the game Workstream and team." },
+    { "name": "work.item.read", "scope": "organization", "purpose": "Inspect exact project tasks, assignments, blockers, and evidence links." },
+    { "name": "work.item.create", "scope": "organization", "purpose": "Delegate profile-typed milestones, features, content, tasks, bugs, spikes, and reviews." },
+    { "name": "work.item.comment", "scope": "organization", "purpose": "Leave auditable creative direction and review feedback on exact work items." },
+    { "name": "work.sprint.read", "scope": "organization", "purpose": "Inspect team plans and delivery cadence." },
+    { "name": "platform.toolchain.catalog.read.v1", "scope": "organization", "purpose": "Select only automation-certified engines and content toolchains compatible with targets." },
+    { "name": "platform.build.request.v1", "scope": "organization", "purpose": "Request reproducible builds from exact source revisions." },
+    { "name": "platform.build.read.v1", "scope": "organization", "purpose": "Inspect actual runnable build status, outputs, and provenance." },
+    { "name": "platform.validation.read.v1", "scope": "organization", "purpose": "Inspect technical, QA, accessibility, performance, and certification validation evidence." },
+    { "name": "platform.preview.create.v1", "scope": "organization", "purpose": "Create bounded previews of successful project builds for creative review." },
+    { "name": "platform.preview.read.v1", "scope": "organization", "purpose": "Review project previews and capture actual audiovisual and gameplay evidence." },
+    { "name": "platform.evaluation-session.plan.v1", "scope": "organization", "purpose": "Plan consent-governed playtests and experience evaluations." },
+    { "name": "platform.evaluation-session.read.v1", "scope": "organization", "purpose": "Read playtest reports, evidence, and provenance." },
+    { "name": "platform.evaluation-session.report.v1", "scope": "organization", "purpose": "Record structured player-evaluation reports and follow-up evidence." },
+    { "name": "platform.release-readiness.read.v1", "scope": "organization", "purpose": "Inspect profile-specific launch evidence and blocking findings." },
+    { "name": "platform.release-readiness.submit.v1", "scope": "organization", "purpose": "Submit game launch-readiness evidence without publishing." },
+    { "name": "platform.publication.propose.v1", "scope": "organization", "purpose": "Propose an approved release-provider publication while final public mutation remains human-gated." },
     { "name": "platform.management.status-report.v1", "scope": "organization", "purpose": "Deliver attributed daily reports to the authoritative manager." }
   ],
   "events": {
@@ -106,8 +146,28 @@
       "com.csweet.management.resource-change.decided.v1",
       "com.csweet.management.staffing-replenishment.decided.v1",
       "com.csweet.workforce.changed.v1",
-      "com.csweet.hiring-recommendation.fulfilled.v1"
-      ,"com.csweet.artifact.access-decision.v1"
+      "com.csweet.hiring-recommendation.fulfilled.v1",
+      "com.csweet.artifact.access-decision.v1",
+      "com.csweet.workstream.changed.v2",
+      "com.csweet.workstream.team-assignment.changed.v1",
+      "com.csweet.workstream.supervision.changed.v1",
+      "com.csweet.workstream.authority-envelope.changed.v1",
+      "com.csweet.workstream.gate.requested.v1",
+      "com.csweet.workstream.gate.decided.v1",
+      "com.csweet.decision.requested.v1",
+      "com.csweet.decision.decided.v1",
+      "com.csweet.artifact.revision.submitted.v1",
+      "com.csweet.artifact.revision.decided.v1",
+      "com.csweet.artifact.package.submitted.v1",
+      "com.csweet.artifact.package.decided.v1",
+      "com.csweet.work.item.changed.v1",
+      "com.csweet.work.sprint.changed.v1",
+      "com.csweet.work.execution.changed.v1",
+      "com.csweet.build.published.v1",
+      "com.csweet.validation.completed.v1",
+      "com.csweet.evaluation-session.completed.v1",
+      "com.csweet.media-job.completed.v1",
+      "com.csweet.release-readiness.changed.v1"
     ]
   },
   "configuration": [

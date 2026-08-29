@@ -66,21 +66,29 @@ public sealed class CreativeDirectorLifecycleTests
     }
 
     [Fact]
-    public void Lifecycle_IsOrderedAndDurable()
+    public void Lifecycle_ExecutesOnlyGovernedTransitions()
     {
-        Assert.Equal([
+        var delegatedPath = new[]
+        {
             CreativeDirectorPhase.Discovery,
             CreativeDirectorPhase.InvolvementConfirmation,
-            CreativeDirectorPhase.HighLevelGddWork,
-            CreativeDirectorPhase.HighLevelReview,
             CreativeDirectorPhase.HighLevelAccepted,
             CreativeDirectorPhase.PMPlanPending,
             CreativeDirectorPhase.PMHiringPending,
+            CreativeDirectorPhase.WorkstreamPlanPending,
+            CreativeDirectorPhase.ProjectSetup,
             CreativeDirectorPhase.DetailedDesign,
             CreativeDirectorPhase.PackageReview,
-            CreativeDirectorPhase.DevelopmentReady,
             CreativeDirectorPhase.Oversight
-        ], Enum.GetValues<CreativeDirectorPhase>());
+        };
+
+        Assert.All(delegatedPath.Zip(delegatedPath.Skip(1)), transition =>
+            Assert.True(VideoGameCreativeDirectorAgent.IsAllowedPhaseTransition(
+                transition.First, transition.Second), $"{transition.First} -> {transition.Second}"));
+        Assert.False(VideoGameCreativeDirectorAgent.IsAllowedPhaseTransition(
+            CreativeDirectorPhase.Discovery, CreativeDirectorPhase.Oversight));
+        Assert.False(VideoGameCreativeDirectorAgent.IsAllowedPhaseTransition(
+            CreativeDirectorPhase.Oversight, CreativeDirectorPhase.DetailedDesign));
     }
 
     [Fact]
@@ -90,6 +98,37 @@ public sealed class CreativeDirectorLifecycleTests
         Assert.Equal(first, VideoGameCreativeDirectorAgent.Digest("A precise game pitch"));
         Assert.NotEqual(first, VideoGameCreativeDirectorAgent.Digest("A different game pitch"));
         Assert.Equal(64, first.Length);
+    }
+
+    [Fact]
+    public void ProjectStateKeysIsolateConcurrentWorkstreamsAndIntakeConversations()
+    {
+        var firstWorkstream = Guid.NewGuid();
+        var secondWorkstream = Guid.NewGuid();
+        var intake = Guid.NewGuid();
+
+        var keys = new[]
+        {
+            VideoGameCreativeDirectorAgent.ProjectStateKey(firstWorkstream, null),
+            VideoGameCreativeDirectorAgent.ProjectStateKey(secondWorkstream, null),
+            VideoGameCreativeDirectorAgent.ProjectStateKey(null, intake),
+            VideoGameCreativeDirectorAgent.PortfolioStateKey
+        };
+
+        Assert.Equal(keys.Length, keys.Distinct(StringComparer.Ordinal).Count());
+        Assert.Contains(firstWorkstream.ToString("N"), keys[0]);
+        Assert.Contains(intake.ToString("N"), keys[2]);
+    }
+
+    [Fact]
+    public void DeterministicArtifactReviewRejectsPlaceholderAndUnstructuredContent()
+    {
+        var findings = VideoGameCreativeDirectorAgent.DeterministicArtifactFindings(
+            "TODO: replace this placeholder with a real design.");
+
+        Assert.Contains(findings, finding => finding.Code == "insufficient-substance" && finding.Blocking);
+        Assert.Contains(findings, finding => finding.Code == "placeholder-content" && finding.Blocking);
+        Assert.Contains(findings, finding => finding.Code == "missing-structure" && finding.Blocking);
     }
 
     [Theory]

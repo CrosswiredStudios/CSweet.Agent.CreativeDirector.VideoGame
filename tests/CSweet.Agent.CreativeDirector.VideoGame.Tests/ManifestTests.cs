@@ -1,4 +1,5 @@
 using CSweet.Agent.SDK;
+using CSweet.WorkManagement.Contracts;
 
 namespace CSweet.Agent.CreativeDirector.VideoGame.Tests;
 
@@ -30,11 +31,35 @@ public sealed class ManifestTests
         Assert.Contains(manifest.Requires, x => x.Name == MemoryCapabilities.BusinessPropose);
         Assert.Contains(manifest.Requires, x => x.Name == AgentLifecycleCapabilities.CompleteOnboarding);
         Assert.Contains(AgentLifecycleEvents.Onboarded, manifest.Events.Subscribes);
+        Assert.Contains(WorkstreamEventNames.ArtifactPackageSubmittedV1, manifest.Events.Subscribes);
+        Assert.Contains(WorkstreamEventNames.ArtifactPackageDecidedV1, manifest.Events.Subscribes);
+        var profile = Assert.Single(manifest.WorkstreamProfiles.Provides);
+        Assert.Equal("video-game-production.v2", profile.Key);
+        Assert.Equal(2, profile.Version);
+        Assert.True(File.Exists(Path.Combine(root,
+            profile.DefinitionResource.Replace('/', Path.DirectorySeparatorChar))));
         Assert.Empty(manifest.Credentials);
         Assert.Equal("None", manifest.WebAccess.Mode);
         Assert.True(File.Exists(Path.Combine(
             root,
             manifest.Runtime.ProjectPath!.Replace('/', Path.DirectorySeparatorChar))));
+    }
+
+    [Fact]
+    public async Task ProductionProfileOwnsLifecycleBoardTypesGatesAndStaffingDeclaratively()
+    {
+        using var profile = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(
+            Path.Combine(RepositoryRoot(), "profiles", "video-game-production.v2.json")));
+        var root = profile.RootElement;
+
+        Assert.Equal("video-game-production.v2", root.GetProperty("key").GetString());
+        Assert.Equal("video-game-production-board.v2", root.GetProperty("defaultBoardProfileKey").GetString());
+        Assert.True(root.GetProperty("lifecycle").GetProperty("stages").GetArrayLength() >= 13);
+        Assert.True(root.GetProperty("workItemTypes").GetArrayLength() >= 7);
+        Assert.True(root.GetProperty("milestones").GetArrayLength() >= 5);
+        Assert.True(root.GetProperty("staffing").GetProperty("requiredRoleKeys").GetArrayLength() >= 14);
+        Assert.DoesNotContain(root.GetProperty("workItemTypes").EnumerateArray(), item =>
+            string.IsNullOrWhiteSpace(item.GetProperty("key").GetString()));
     }
 
     [Fact]

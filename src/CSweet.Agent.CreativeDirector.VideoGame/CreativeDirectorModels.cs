@@ -6,14 +6,14 @@ public enum CreativeDirectorPhase
 {
     Discovery = 0,
     InvolvementConfirmation = 1,
-    HighLevelGddWork = 2,
-    HighLevelReview = 3,
-    HighLevelAccepted = 4,
-    PMPlanPending = 5,
-    PMHiringPending = 6,
-    DetailedDesign = 7,
-    PackageReview = 8,
-    DevelopmentReady = 9,
+    HighLevelReview = 2,
+    HighLevelAccepted = 3,
+    PMPlanPending = 4,
+    PMHiringPending = 5,
+    WorkstreamPlanPending = 6,
+    ProjectSetup = 7,
+    DetailedDesign = 8,
+    PackageReview = 9,
     Oversight = 10
 }
 
@@ -31,6 +31,7 @@ public sealed record ManagerPreferenceProfile
     public bool InvolvementWasExplicit { get; init; }
     public int InvolvementEvidenceCount { get; init; }
     public IReadOnlyList<string> PlatformConstraints { get; init; } = [];
+    public IReadOnlyList<string> EnginePreferences { get; init; } = [];
     public IReadOnlyList<string> GenreConstraints { get; init; } = [];
     public IReadOnlyList<string> NarrativeConstraints { get; init; } = [];
     public string? StoryParticipation { get; init; }
@@ -52,6 +53,9 @@ public sealed record AcceptedGameVision(
     int Revision,
     string Digest,
     string Markdown,
+    Guid ArtifactId,
+    Guid ArtifactRevisionId,
+    string ArtifactRevisionHash,
     Guid ConversationId,
     Guid ChatTurnId,
     Guid MessageId,
@@ -73,10 +77,30 @@ public sealed record PendingCreativeEscalation(
     Guid SourceMessageId,
     string Question,
     DateTimeOffset EscalatedAt,
+    Guid? DecisionId = null,
     bool Relayed = false);
+
+public sealed record CreativeDirectorPortfolioEntry(
+    string StateKey,
+    Guid? WorkstreamId,
+    Guid ConversationId,
+    Guid? TeamId,
+    Guid? BoardId,
+    string WorkingTitle,
+    CreativeDirectorPhase Phase,
+    DateTimeOffset UpdatedAt);
+
+public sealed record CreativeDirectorPortfolioIndex
+{
+    public IReadOnlyList<CreativeDirectorPortfolioEntry> Projects { get; init; } = [];
+}
 
 public sealed record CreativeDirectorOperatingState
 {
+    public Guid? IntakeConversationId { get; init; }
+    public Guid? WorkstreamId { get; init; }
+    public Guid? TeamId { get; init; }
+    public Guid? BoardId { get; init; }
     public CreativeDirectorPhase Phase { get; init; } = CreativeDirectorPhase.Discovery;
     public bool IntakeChoiceAsked { get; init; }
     public Guid? OnboardingEventId { get; init; }
@@ -90,11 +114,11 @@ public sealed record CreativeDirectorOperatingState
     public Guid? HighLevelLatestRevisionId { get; init; }
     public Guid? HighLevelAcceptedRevisionId { get; init; }
     public Guid? DetailedDesignPackageId { get; init; }
-    public Guid? NarrativeWorldArtifactId { get; init; }
-    public Guid? ArtAudioDirectionArtifactId { get; init; }
     public IReadOnlyList<ReferenceEvidence> References { get; init; } = [];
     public Guid? StaffingRequestId { get; init; }
     public Guid? ProductManagerEmployeeId { get; init; }
+    public Guid? WorkstreamProposalId { get; init; }
+    public string? WorkingTitle { get; init; }
     public Guid? HandoffSessionId { get; init; }
     public IReadOnlyList<PendingCreativeEscalation> PendingEscalations { get; init; } = [];
     public IReadOnlyList<ManagementStatusReport> SubordinateReports { get; init; } = [];
@@ -122,3 +146,16 @@ public sealed record GameVisionAcknowledgement(
     bool Acknowledged,
     IReadOnlyList<string> Blockers,
     DateTimeOffset AcknowledgedAt);
+
+internal sealed record SemanticArtifactReview(
+    string Disposition,
+    string Summary,
+    IReadOnlyList<SemanticArtifactFinding> Findings);
+
+internal sealed record SemanticArtifactFinding(
+    string Code,
+    string Section,
+    string Severity,
+    bool Blocking,
+    string Summary,
+    string? RequiredFollowUp);

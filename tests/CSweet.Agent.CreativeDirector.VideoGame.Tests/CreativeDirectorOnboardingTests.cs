@@ -6,6 +6,69 @@ namespace CSweet.Agent.CreativeDirector.VideoGame.Tests;
 public sealed class CreativeDirectorOnboardingTests
 {
     [Fact]
+    public async Task ConcurrentProjectIntakesRemainIsolatedAndAppearInPortfolioIndex()
+    {
+        var organizationId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var conversations = new[] { Guid.NewGuid(), Guid.NewGuid() };
+        var stored = new Dictionary<string, AgentOperatingStateResponse>(StringComparer.Ordinal);
+        var runtime = new AgentTestRuntime()
+            .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(
+                PlatformCapabilities.AgentOperatingStateRead,
+                (request, _) => Task.FromResult(new AgentOperatingStateReadResponse(
+                    stored.GetValueOrDefault(request.StateKey))))
+            .RegisterCapability<AgentOperatingStateWriteRequest, AgentOperatingStateResponse>(
+                PlatformCapabilities.AgentOperatingStateWrite,
+                (request, _) =>
+                {
+                    var previous = stored.GetValueOrDefault(request.StateKey);
+                    var saved = new AgentOperatingStateResponse(
+                        previous?.Id ?? Guid.NewGuid(), request.StateKey, request.SchemaId, request.SchemaVersion,
+                        request.Status, request.SourceRevisions, request.ConditionCodes,
+                        request.DecisionFingerprint, request.OpenCommitmentCorrelations,
+                        request.AttentionReviewId, request.Payload, (previous?.Revision ?? 0) + 1,
+                        previous?.CreatedAt ?? DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+                    stored[request.StateKey] = saved;
+                    return Task.FromResult(saved);
+                })
+            .RegisterCapability<JsonElement, CommunicationMessage>(
+                CommunicationCapabilities.MessageSend,
+                (request, _) => Task.FromResult(new CommunicationMessage(
+                    Guid.NewGuid(), 1, request.GetProperty("chatId").GetGuid(), employeeId,
+                    "Creative Director", "Agent", request.GetProperty("content").GetString()!, DateTimeOffset.UtcNow)))
+            .RegisterCapability<AskUserRequest, UserQuestionResponse>(
+                PlatformCapabilities.UserInputRequest,
+                (request, _) => Task.FromResult(new UserQuestionResponse(
+                    Guid.NewGuid(), request.Prompt, "Pending",
+                    request.Options.Select(option => new UserQuestionOptionResponse(
+                        option.Id, option.Label, option.Description, option.Id == request.RecommendedOptionId)).ToList(),
+                    request.RecommendedOptionId, null, null, DateTimeOffset.UtcNow, null)))
+            .RegisterCapability<CompleteAgentOnboardingRequest, CompleteAgentOnboardingResponse>(
+                AgentLifecycleCapabilities.CompleteOnboarding,
+                (_, _) => Task.FromResult(new CompleteAgentOnboardingResponse(true, DateTimeOffset.UtcNow)));
+        var context = runtime.CreateContext(organizationId.ToString("D"), Guid.NewGuid().ToString("D"),
+            new AgentIdentity(employeeId.ToString("D"), "Creative Director", null, "Creative Director",
+                null, [], null, managerId.ToString("D"), "Owner"));
+        var agent = new VideoGameCreativeDirectorAgent();
+
+        foreach (var conversationId in conversations)
+            await agent.HandleEventAsync(new AgentEventEnvelope(
+                Guid.NewGuid(), Guid.NewGuid(), AgentLifecycleEvents.Onboarded,
+                JsonSerializer.SerializeToElement(new AgentOnboardedEvent(
+                    organizationId, employeeId, managerId, conversationId, DateTimeOffset.UtcNow)),
+                DateTimeOffset.UtcNow), context, CancellationToken.None);
+
+        Assert.All(conversations, conversationId =>
+            Assert.True(stored.ContainsKey(VideoGameCreativeDirectorAgent.ProjectStateKey(null, conversationId))));
+        var portfolio = stored[VideoGameCreativeDirectorAgent.PortfolioStateKey].Payload
+            .Deserialize<CreativeDirectorPortfolioIndex>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.NotNull(portfolio);
+        Assert.Equal(2, portfolio!.Projects.Count);
+        Assert.Equal(conversations.Order(), portfolio.Projects.Select(x => x.ConversationId).Order());
+    }
+
+    [Fact]
     public async Task OnboardingIsIdempotentAndCompletesLifecycleWithoutStaffing()
     {
         var organizationId = Guid.NewGuid();
@@ -13,7 +76,7 @@ public sealed class CreativeDirectorOnboardingTests
         var managerId = Guid.NewGuid();
         var conversationId = Guid.NewGuid();
         var eventId = Guid.NewGuid();
-        AgentOperatingStateResponse? stored = null;
+        var stored = new Dictionary<string, AgentOperatingStateResponse>(StringComparer.Ordinal);
         var messages = 0;
         string? onboardingMessage = null;
         var onboardingMessageId = Guid.NewGuid();
@@ -23,18 +86,21 @@ public sealed class CreativeDirectorOnboardingTests
         var runtime = new AgentTestRuntime()
             .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(
                 PlatformCapabilities.AgentOperatingStateRead,
-                (_, _) => Task.FromResult(new AgentOperatingStateReadResponse(stored)))
+                (request, _) => Task.FromResult(new AgentOperatingStateReadResponse(
+                    stored.GetValueOrDefault(request.StateKey))))
             .RegisterCapability<AgentOperatingStateWriteRequest, AgentOperatingStateResponse>(
                 PlatformCapabilities.AgentOperatingStateWrite,
                 (request, _) =>
                 {
-                    stored = new AgentOperatingStateResponse(
+                    var previous = stored.GetValueOrDefault(request.StateKey);
+                    var saved = new AgentOperatingStateResponse(
                         Guid.NewGuid(), request.StateKey, request.SchemaId, request.SchemaVersion,
                         request.Status, request.SourceRevisions, request.ConditionCodes,
                         request.DecisionFingerprint, request.OpenCommitmentCorrelations,
-                        request.AttentionReviewId, request.Payload, (stored?.Revision ?? 0) + 1,
+                        request.AttentionReviewId, request.Payload, (previous?.Revision ?? 0) + 1,
                         DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
-                    return Task.FromResult(stored);
+                    stored[request.StateKey] = saved;
+                    return Task.FromResult(saved);
                 })
             .RegisterCapability<JsonElement, CommunicationMessage>(
                 CommunicationCapabilities.MessageSend,
@@ -97,7 +163,8 @@ public sealed class CreativeDirectorOnboardingTests
         Assert.Equal(3, onboardingQuestion.Options.Count);
         Assert.Equal(2, completions);
         Assert.Equal(0, staffingProposals);
-        var state = stored!.Payload.Deserialize<CreativeDirectorOperatingState>(
+        var projectStateKey = VideoGameCreativeDirectorAgent.ProjectStateKey(null, conversationId);
+        var state = stored[projectStateKey].Payload.Deserialize<CreativeDirectorOperatingState>(
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
         Assert.Equal(eventId, state!.OnboardingEventId);
         Assert.True(state.IntakeChoiceAsked);
@@ -113,23 +180,26 @@ public sealed class CreativeDirectorOnboardingTests
         var conversationId = Guid.NewGuid();
         var turnId = Guid.NewGuid();
         var messageId = Guid.NewGuid();
-        AgentOperatingStateResponse? stored = null;
+        var stored = new Dictionary<string, AgentOperatingStateResponse>(StringComparer.Ordinal);
         AskUserRequest? question = null;
         var runtime = new AgentTestRuntime()
             .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(
                 PlatformCapabilities.AgentOperatingStateRead,
-                (_, _) => Task.FromResult(new AgentOperatingStateReadResponse(stored)))
+                (request, _) => Task.FromResult(new AgentOperatingStateReadResponse(
+                    stored.GetValueOrDefault(request.StateKey))))
             .RegisterCapability<AgentOperatingStateWriteRequest, AgentOperatingStateResponse>(
                 PlatformCapabilities.AgentOperatingStateWrite,
                 (request, _) =>
                 {
-                    stored = new AgentOperatingStateResponse(
+                    var previous = stored.GetValueOrDefault(request.StateKey);
+                    var saved = new AgentOperatingStateResponse(
                         Guid.NewGuid(), request.StateKey, request.SchemaId, request.SchemaVersion,
                         request.Status, request.SourceRevisions, request.ConditionCodes,
                         request.DecisionFingerprint, request.OpenCommitmentCorrelations,
-                        request.AttentionReviewId, request.Payload, (stored?.Revision ?? 0) + 1,
+                        request.AttentionReviewId, request.Payload, (previous?.Revision ?? 0) + 1,
                         DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
-                    return Task.FromResult(stored);
+                    stored[request.StateKey] = saved;
+                    return Task.FromResult(saved);
                 })
             .RegisterCapability<AskUserRequest, UserQuestionResponse>(
                 PlatformCapabilities.UserInputRequest,
@@ -181,8 +251,9 @@ public sealed class CreativeDirectorOnboardingTests
         var managerId = Guid.NewGuid();
         var conversationId = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
-        AgentOperatingStateResponse? stored = new(
-            Guid.NewGuid(), VideoGameCreativeDirectorAgent.StateKey, "test", 1,
+        var projectStateKey = VideoGameCreativeDirectorAgent.ProjectStateKey(null, conversationId);
+        var initial = new AgentOperatingStateResponse(
+            Guid.NewGuid(), projectStateKey, "test", 1,
             CreativeDirectorPhase.InvolvementConfirmation.ToString(), new Dictionary<string, string>(),
             [], "pending", [], Guid.NewGuid(),
             JsonSerializer.SerializeToElement(new CreativeDirectorOperatingState
@@ -190,21 +261,28 @@ public sealed class CreativeDirectorOnboardingTests
                 Phase = CreativeDirectorPhase.InvolvementConfirmation,
                 IntakeChoiceAsked = true
             }), 1, now, now);
+        var stored = new Dictionary<string, AgentOperatingStateResponse>(StringComparer.Ordinal)
+        {
+            [projectStateKey] = initial
+        };
         var runtime = new AgentTestRuntime()
             .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(
                 PlatformCapabilities.AgentOperatingStateRead,
-                (_, _) => Task.FromResult(new AgentOperatingStateReadResponse(stored)))
+                (request, _) => Task.FromResult(new AgentOperatingStateReadResponse(
+                    stored.GetValueOrDefault(request.StateKey))))
             .RegisterCapability<AgentOperatingStateWriteRequest, AgentOperatingStateResponse>(
                 PlatformCapabilities.AgentOperatingStateWrite,
                 (request, _) =>
                 {
-                    stored = new AgentOperatingStateResponse(
-                        stored!.Id, request.StateKey, request.SchemaId, request.SchemaVersion,
+                    var previous = stored.GetValueOrDefault(request.StateKey);
+                    var saved = new AgentOperatingStateResponse(
+                        previous?.Id ?? Guid.NewGuid(), request.StateKey, request.SchemaId, request.SchemaVersion,
                         request.Status, request.SourceRevisions, request.ConditionCodes,
                         request.DecisionFingerprint, request.OpenCommitmentCorrelations,
-                        request.AttentionReviewId, request.Payload, stored.Revision + 1,
-                        stored.CreatedAt, DateTimeOffset.UtcNow);
-                    return Task.FromResult(stored);
+                        request.AttentionReviewId, request.Payload, (previous?.Revision ?? 0) + 1,
+                        previous?.CreatedAt ?? DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+                    stored[request.StateKey] = saved;
+                    return Task.FromResult(saved);
                 });
         var context = runtime.CreateContext(
             organizationId.ToString("D"), Guid.NewGuid().ToString("D"),
@@ -223,7 +301,7 @@ public sealed class CreativeDirectorOnboardingTests
                 JsonSerializer.SerializeToElement(incoming), DateTimeOffset.UtcNow),
             context, CancellationToken.None);
 
-        var state = stored!.Payload.Deserialize<CreativeDirectorOperatingState>(
+        var state = stored[projectStateKey].Payload.Deserialize<CreativeDirectorOperatingState>(
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
         Assert.Equal(ManagerInvolvementMode.MilestoneReview, state!.ManagerPreferences.InvolvementMode);
         Assert.True(state.ManagerPreferences.InvolvementWasExplicit);
