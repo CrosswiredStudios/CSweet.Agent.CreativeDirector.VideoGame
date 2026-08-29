@@ -17,9 +17,15 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     public const string VisionBriefArtifactType = "creative-direction.game-vision-brief.v1";
     public const string VisionAcknowledgementArtifactType = "product-management.game-vision-acknowledgement.v1";
     private const string StateSchema = "com.csweet.video-game-creative-director.operating-state.v1";
+    private static readonly IReadOnlyList<AskUserOption> InvolvementOptions =
+    [
+        new("delegated", "Delegate decisions", "I decide every unspecified creative choice and lock the initial vision."),
+        new("milestone-review", "Review milestones", "I propose the vision and wait for explicit approval at major milestones."),
+        new("collaborative", "Collaborate closely", "We iteratively refine the pitch before the vision is locked.")
+    ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "0.3.0";
+    public override string Version => "0.3.1";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -105,14 +111,23 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         var current = await ReadStateAsync(context, cancellationToken);
         if (current.State.OnboardingEventId != message.EventId)
         {
-            await context.Platform.Communication.SendMessageAsync(
+            var onboardingMessage = await context.Platform.Communication.SendMessageAsync(
                 onboarded.ConversationId,
-                "I’m ready to lead the game’s creative vision and initial product-team design. Send any starting context or reference files when you’re ready. On your first turn, I’ll present one structured choice for how closely you want to collaborate, then I’ll own every unspecified decision. I won’t submit staffing before that choice is recorded.",
+                "I’m ready to lead the game’s creative vision and initial product-team design. Choose how closely you want to collaborate below; you can add starting context or reference files with your answer. I’ll own every unspecified decision, and I won’t submit staffing before this choice is recorded.",
                 $"video-game-creative-onboarding:{message.EventId:N}",
                 cancellationToken);
+            _ = await context.Platform.AskUserAsync(new AskUserRequest(
+                onboarded.ConversationId,
+                null,
+                "How involved do you want to be in creative direction?",
+                InvolvementOptions,
+                "milestone-review",
+                $"creative-intake:{message.EventId:N}",
+                onboardingMessage.Id), cancellationToken);
             await SaveStateAsync(current.State with
             {
-                IntakeChoiceAsked = false,
+                Phase = CreativeDirectorPhase.InvolvementConfirmation,
+                IntakeChoiceAsked = true,
                 OnboardingEventId = message.EventId,
                 OnboardingCompletedAt = DateTimeOffset.UtcNow
             }, current.Revision, message.EventId, $"onboarding-state:{message.EventId:N}", context, cancellationToken);
@@ -319,7 +334,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 .Select(x => Guid.Parse(x.Value)).Distinct().ToList();
             if (ids.Count < 6)
             {
-                await stream.WriteDraftAsync("Send the package ID and all five exact member artifact IDs. Package membership itself does not grant me document access.", cancellationToken);
+                await stream.CommitAsync("Send the package ID and all five exact member artifact IDs. Package membership itself does not grant me document access.", cancellationToken);
                 return;
             }
             var packageId = ids[0];
@@ -334,13 +349,13 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             await SaveStateAsync(state with { DetailedDesignPackageId = packageId,
                     Phase = CreativeDirectorPhase.PackageReview }, current.Revision, Guid.NewGuid(),
                 $"creative-package-received:{packageId:N}", context, cancellationToken);
-            await stream.WriteDraftAsync("I requested human approval for the exact per-file grants needed to review this package. Delegated creative authority does not bypass document security.", cancellationToken);
+            await stream.CommitAsync("I requested human approval for the exact per-file grants needed to review this package. Delegated creative authority does not bypass document security.", cancellationToken);
             return;
         }
 
         if (!isManager && state.Phase != CreativeDirectorPhase.Oversight)
         {
-            await stream.WriteDraftAsync(
+            await stream.CommitAsync(
                 "Only my authoritative manager can direct or accept the game vision. I can answer reporting-tree creative questions after the vision handoff.",
                 cancellationToken);
             return;
@@ -366,7 +381,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             };
             await SaveStateAsync(state, current.Revision, Guid.NewGuid(),
                 $"creative-escalation-relayed:{incoming.MessageId:N}", context, cancellationToken);
-            await stream.WriteDraftAsync(
+            await stream.CommitAsync(
                 $"I relayed this authoritative decision to {pendingEscalations.Count} waiting worker(s).",
                 cancellationToken);
             return;
@@ -377,11 +392,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             _ = await context.Platform.AskUserAsync(new AskUserRequest(
                 conversationId, incoming.TurnId,
                 "How involved do you want to be in creative direction?",
-                [
-                    new("delegated", "Delegate decisions", "I decide every unspecified creative choice and lock the initial vision."),
-                    new("milestone-review", "Review milestones", "I propose the vision and wait for explicit approval at major milestones."),
-                    new("collaborative", "Collaborate closely", "We iteratively refine the pitch before the vision is locked.")
-                ],
+                InvolvementOptions,
                 "milestone-review",
                 $"creative-intake:{incoming.MessageId:N}"), cancellationToken);
             var preferences = UpdateManagerPreferences(
@@ -398,7 +409,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             await ProposeExplicitMemoriesAsync(incoming, context, cancellationToken);
             await SaveStateAsync(state, current.Revision, Guid.NewGuid(),
                 $"creative-intake-state:{incoming.MessageId:N}", context, cancellationToken);
-            await stream.WriteDraftAsync(
+            await stream.CommitAsync(
                 "Choose an involvement mode, then add any platform, genre, story-participation, or reference constraints that matter. I’ll own everything you leave unspecified and will not submit staffing until your next reply.",
                 cancellationToken);
             return;
@@ -417,6 +428,9 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 References = MergeReferences(state.References, incoming.Attachments, conversationId)
             };
             await ProposeExplicitMemoriesAsync(incoming, context, cancellationToken);
+            current = await SaveStateAsync(state, current.Revision, Guid.NewGuid(),
+                $"manager-preferences:{incoming.MessageId:N}", context, cancellationToken);
+            state = current.State;
         }
 
         if (state.Phase == CreativeDirectorPhase.HighLevelReview && IsVisionLock(currentMessage) && state.Proposals.Count > 0)
@@ -433,7 +447,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 }
                 catch (PlatformCapabilityException exception)
                 {
-                    await stream.WriteDraftAsync($"I could not record the approval: {exception.Message}. Use the document Accept button or approve the pending exact-file access request.", cancellationToken);
+                    await stream.CommitAsync($"I could not record the approval: {exception.Message}. Use the document Accept button or approve the pending exact-file access request.", cancellationToken);
                     return;
                 }
             }
@@ -447,7 +461,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             };
             var saved = await SaveStateAsync(state, current.Revision, Guid.NewGuid(),
                 $"vision-accepted:{latest.Digest}", context, cancellationToken);
-            await stream.WriteDraftAsync(
+            await stream.CommitAsync(
                 $"Vision revision {latest.Revision} (`{latest.Digest}`) is accepted. I’ll now submit the single Product Manager staffing plan and wait for governed approval and fulfillment.",
                 cancellationToken);
             await ReconcileAsync(Guid.NewGuid(), context, cancellationToken, saved.State, saved.Revision);
@@ -465,7 +479,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                     new("world-tone", "World and tone", "Keep useful mechanics but move to a different theme, setting, narrative, or mood."),
                     new("scope-platform", "Scope or platform", "Change feasibility, session shape, target device, or MVP ambition.")
                 ], "loop", $"pitch-guidance:{incoming.MessageId:N}"), cancellationToken);
-            await stream.WriteDraftAsync(
+            await stream.CommitAsync(
                 "I’ve preserved the positive constraints from the latest revision. Choose the dimension that should move furthest; I’ll replace the pitch without recycling the rejected premise.",
                 cancellationToken);
             return;
@@ -474,8 +488,20 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         if (state.Phase is CreativeDirectorPhase.Discovery or CreativeDirectorPhase.InvolvementConfirmation or CreativeDirectorPhase.HighLevelReview)
         {
             var references = state.References;
-            var pitch = await GeneratePitchAsync(incoming, currentMessage, state,
-                conversationId, context, cancellationToken);
+            string pitch;
+            try
+            {
+                pitch = await GeneratePitchAsync(incoming, currentMessage, state,
+                    conversationId, context, cancellationToken);
+            }
+            catch (PlatformCapabilityException exception) when (
+                exception.Capability == PlatformCapabilities.LlmChatStream)
+            {
+                await stream.CommitAsync(
+                    $"I recorded your {DescribeInvolvementMode(state.ManagerPreferences.InvolvementMode)} involvement preference, but the configured model could not generate the high-level game vision. Check the Creative Director's LLM provider and retry; your choice will not be lost.",
+                    cancellationToken);
+                return;
+            }
             var revision = state.Proposals.Count == 0 ? 1 : state.Proposals.Max(x => x.Revision) + 1;
             var digest = Digest(pitch);
             var disposition = InitialVisionDisposition(state.ManagerPreferences.InvolvementMode);
@@ -568,13 +594,13 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             }
             var saved = await SaveStateAsync(state, current.Revision, Guid.NewGuid(),
                 $"pitch-revision:{digest}", context, cancellationToken);
-            await stream.WriteDraftAsync($"{formal}\n\n[Open the live high-level GDD](/organizations/{context.BusinessId}/documents?artifact={document.Id:D})", cancellationToken);
+            await stream.CommitAsync($"{formal}\n\n[Open the live high-level GDD](/organizations/{context.BusinessId}/documents?artifact={document.Id:D})", cancellationToken);
             if (artifactAccepted)
                 await ReconcileAsync(Guid.NewGuid(), context, cancellationToken, saved.State, saved.Revision);
             return;
         }
 
-        await stream.WriteDraftAsync(
+        await stream.CommitAsync(
             state.Phase switch
             {
                 CreativeDirectorPhase.PMPlanPending => "The Product Manager plan is awaiting the authoritative manager’s decision.",
@@ -1246,6 +1272,13 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         ManagerInvolvementMode.Delegated => "LockAndStaff",
         ManagerInvolvementMode.Collaborative => "IterateCollaboratively",
         _ => "AwaitExplicitMilestoneApproval"
+    };
+
+    private static string DescribeInvolvementMode(ManagerInvolvementMode mode) => mode switch
+    {
+        ManagerInvolvementMode.Delegated => "delegated",
+        ManagerInvolvementMode.Collaborative => "collaborative",
+        _ => "milestone-review"
     };
 
     private static string? ParseStoryParticipation(string message)

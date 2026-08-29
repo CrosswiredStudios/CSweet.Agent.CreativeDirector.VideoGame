@@ -16,6 +16,8 @@ public sealed class CreativeDirectorOnboardingTests
         AgentOperatingStateResponse? stored = null;
         var messages = 0;
         string? onboardingMessage = null;
+        var onboardingMessageId = Guid.NewGuid();
+        AskUserRequest? onboardingQuestion = null;
         var completions = 0;
         var staffingProposals = 0;
         var runtime = new AgentTestRuntime()
@@ -41,9 +43,21 @@ public sealed class CreativeDirectorOnboardingTests
                     messages++;
                     onboardingMessage = request.GetProperty("content").GetString();
                     return Task.FromResult(new CommunicationMessage(
-                        Guid.NewGuid(), messages, request.GetProperty("chatId").GetGuid(), employeeId,
+                        onboardingMessageId, messages, request.GetProperty("chatId").GetGuid(), employeeId,
                         "Creative Director", "Agent", request.GetProperty("content").GetString()!,
                         DateTimeOffset.UtcNow));
+                })
+            .RegisterCapability<AskUserRequest, UserQuestionResponse>(
+                PlatformCapabilities.UserInputRequest,
+                (request, _) =>
+                {
+                    onboardingQuestion = request;
+                    return Task.FromResult(new UserQuestionResponse(
+                        Guid.NewGuid(), request.Prompt, "Pending",
+                        request.Options.Select(option => new UserQuestionOptionResponse(
+                            option.Id, option.Label, option.Description,
+                            option.Id == request.RecommendedOptionId)).ToList(),
+                        request.RecommendedOptionId, null, null, DateTimeOffset.UtcNow, null));
                 })
             .RegisterCapability<CompleteAgentOnboardingRequest, CompleteAgentOnboardingResponse>(
                 AgentLifecycleCapabilities.CompleteOnboarding,
@@ -75,14 +89,19 @@ public sealed class CreativeDirectorOnboardingTests
 
         Assert.Equal(1, messages);
         Assert.NotNull(onboardingMessage);
-        Assert.DoesNotContain("?", onboardingMessage, StringComparison.Ordinal);
-        Assert.Contains("structured choice", onboardingMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Choose how closely", onboardingMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(onboardingQuestion);
+        Assert.Null(onboardingQuestion.ChatTurnId);
+        Assert.Equal(onboardingMessageId, onboardingQuestion.ConversationMessageId);
+        Assert.Equal("How involved do you want to be in creative direction?", onboardingQuestion.Prompt);
+        Assert.Equal(3, onboardingQuestion.Options.Count);
         Assert.Equal(2, completions);
         Assert.Equal(0, staffingProposals);
         var state = stored!.Payload.Deserialize<CreativeDirectorOperatingState>(
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
         Assert.Equal(eventId, state!.OnboardingEventId);
-        Assert.False(state.IntakeChoiceAsked);
+        Assert.True(state.IntakeChoiceAsked);
+        Assert.Equal(CreativeDirectorPhase.InvolvementConfirmation, state.Phase);
     }
 
     [Fact]
@@ -150,5 +169,67 @@ public sealed class CreativeDirectorOnboardingTests
         Assert.Equal(question.Options.Count, question.Options.Select(option => option.Id).Distinct().Count());
         Assert.DoesNotContain(runtime.Progress,
             progress => progress.GetProperty("delta").GetString()?.TrimEnd().EndsWith('?') == true);
+        Assert.Contains(runtime.Progress,
+            progress => progress.GetProperty("kind").GetString() == AgentTurnStreamKinds.FinalCommit);
+    }
+
+    [Fact]
+    public async Task InvolvementAnswerIsDurableAndReturnsRecoverableResponseWhenModelIsUnavailable()
+    {
+        var organizationId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var conversationId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        AgentOperatingStateResponse? stored = new(
+            Guid.NewGuid(), VideoGameCreativeDirectorAgent.StateKey, "test", 1,
+            CreativeDirectorPhase.InvolvementConfirmation.ToString(), new Dictionary<string, string>(),
+            [], "pending", [], Guid.NewGuid(),
+            JsonSerializer.SerializeToElement(new CreativeDirectorOperatingState
+            {
+                Phase = CreativeDirectorPhase.InvolvementConfirmation,
+                IntakeChoiceAsked = true
+            }), 1, now, now);
+        var runtime = new AgentTestRuntime()
+            .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(
+                PlatformCapabilities.AgentOperatingStateRead,
+                (_, _) => Task.FromResult(new AgentOperatingStateReadResponse(stored)))
+            .RegisterCapability<AgentOperatingStateWriteRequest, AgentOperatingStateResponse>(
+                PlatformCapabilities.AgentOperatingStateWrite,
+                (request, _) =>
+                {
+                    stored = new AgentOperatingStateResponse(
+                        stored!.Id, request.StateKey, request.SchemaId, request.SchemaVersion,
+                        request.Status, request.SourceRevisions, request.ConditionCodes,
+                        request.DecisionFingerprint, request.OpenCommitmentCorrelations,
+                        request.AttentionReviewId, request.Payload, stored.Revision + 1,
+                        stored.CreatedAt, DateTimeOffset.UtcNow);
+                    return Task.FromResult(stored);
+                });
+        var context = runtime.CreateContext(
+            organizationId.ToString("D"), Guid.NewGuid().ToString("D"),
+            new AgentIdentity(employeeId.ToString("D"), "Creative Director", null,
+                "Creative Director", null, [], null, managerId.ToString("D"), "Owner"));
+        var incoming = new CommunicationMessageReceivedEvent(
+            Guid.NewGuid(), conversationId.ToString("D"), managerId.ToString("D"),
+            "Decision: How involved do you want to be in creative direction?\nAnswer: Review milestones",
+            new Dictionary<string, string>
+            {
+                [CommunicationMessageContextKeys.SenderOrganizationUserId] = managerId.ToString("D")
+            }, Guid.NewGuid(), 1, Guid.NewGuid());
+
+        await new VideoGameCreativeDirectorAgent().HandleEventAsync(
+            new AgentEventEnvelope(Guid.NewGuid(), Guid.NewGuid(), CommunicationEvents.MessageReceived,
+                JsonSerializer.SerializeToElement(incoming), DateTimeOffset.UtcNow),
+            context, CancellationToken.None);
+
+        var state = stored!.Payload.Deserialize<CreativeDirectorOperatingState>(
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.Equal(ManagerInvolvementMode.MilestoneReview, state!.ManagerPreferences.InvolvementMode);
+        Assert.True(state.ManagerPreferences.InvolvementWasExplicit);
+        var response = Assert.Single(runtime.Progress,
+            progress => progress.GetProperty("kind").GetString() == AgentTurnStreamKinds.FinalCommit);
+        Assert.Contains("choice will not be lost", response.GetProperty("delta").GetString(),
+            StringComparison.OrdinalIgnoreCase);
     }
 }
