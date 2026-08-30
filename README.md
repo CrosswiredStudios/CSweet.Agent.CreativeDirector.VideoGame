@@ -69,4 +69,4 @@ user/business memory, and supplied broker references. Explicit preferences and p
 may be proposed to governed memory immediately; inferred persona preferences are not persisted
 from a single observation and remain subject to platform approval.
 
-Built with `CSweet.Agent.SDK` 4.0.0, `CSweet.VideoGame.Contracts` 1.1.0, `CSweet.VideoGame.AgentKit` 1.0.0, and `CSweet.Memory` 0.1.2.
+Built with `CSweet.Agent.SDK` 3.24.0, `CSweet.VideoGame.Contracts` 1.1.0, `CSweet.VideoGame.AgentKit` 1.0.0, and `CSweet.Memory` 0.1.2.
