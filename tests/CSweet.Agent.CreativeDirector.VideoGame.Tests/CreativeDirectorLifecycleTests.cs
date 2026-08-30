@@ -1,6 +1,7 @@
 using System.Text.Json;
 using CSweet.Agent.SDK;
 using CSweet.Memory;
+using CSweet.VideoGame.Contracts;
 
 namespace CSweet.Agent.CreativeDirector.VideoGame.Tests;
 
@@ -73,8 +74,8 @@ public sealed class CreativeDirectorLifecycleTests
             CreativeDirectorPhase.Discovery,
             CreativeDirectorPhase.InvolvementConfirmation,
             CreativeDirectorPhase.HighLevelAccepted,
-            CreativeDirectorPhase.PMPlanPending,
-            CreativeDirectorPhase.PMHiringPending,
+            CreativeDirectorPhase.TeamPlanPending,
+            CreativeDirectorPhase.TeamStaffingPending,
             CreativeDirectorPhase.WorkstreamPlanPending,
             CreativeDirectorPhase.ProjectSetup,
             CreativeDirectorPhase.DetailedDesign,
@@ -260,14 +261,109 @@ public sealed class CreativeDirectorLifecycleTests
     }
 
     [Fact]
-    public void ProductManagerPlanContainsOneDirectReportToCreativeDirector()
+    public void StudioPlanContainsFourteenDistinctAccountableRolesLedByProducer()
     {
         var creativeDirectorId = Guid.NewGuid();
-        var role = VideoGameCreativeDirectorAgent.BuildProductManagerRole(creativeDirectorId);
+        var roles = VideoGameCreativeDirectorAgent.BuildRequiredStudioRoles(creativeDirectorId);
 
-        Assert.Equal("product-manager", role.RoleKey);
-        Assert.Equal(1, role.Headcount);
-        Assert.Equal(creativeDirectorId, role.ReportsToOrganizationUserId);
-        Assert.Equal(["product-management.plan.v1"], role.RequiredCapabilities);
+        Assert.Equal(14, roles.Count);
+        Assert.Equal(14, roles.Select(x => x.RoleKey).Distinct(StringComparer.Ordinal).Count());
+        Assert.All(roles, role => Assert.Equal(1, role.Headcount));
+        var producer = Assert.Single(roles, role => role.RoleKey == VideoGameRoleKeys.Producer);
+        Assert.Equal(creativeDirectorId, producer.ReportsToOrganizationUserId);
+        Assert.All(roles.Where(role => role.RoleKey != VideoGameRoleKeys.Producer), role =>
+            Assert.Equal(VideoGameRoleKeys.Producer, role.ReportsToRoleKey));
     }
+
+    [Theory]
+    [InlineData("web browser Phaser 2D", VideoGameToolchainRecipeKeys.PhaserWeb2D)]
+    [InlineData("web browser Babylon 3D", VideoGameToolchainRecipeKeys.BabylonWeb3D)]
+    [InlineData("Windows native Godot 2D", VideoGameToolchainRecipeKeys.GodotNative2DGdscript)]
+    [InlineData("Linux native Godot 3D", VideoGameToolchainRecipeKeys.GodotNative3DGdscript)]
+    public void ToolchainRecipesFollowLockedTargetAndDimensionalityRules(string direction, string expected)
+    {
+        var state = new CreativeDirectorOperatingState
+        {
+            ManagerPreferences = new ManagerPreferenceProfile { PlatformConstraints = [direction] }
+        };
+
+        Assert.Equal(expected, VideoGameCreativeDirectorAgent.DetermineRequiredRecipe(state));
+    }
+
+    [Theory]
+    [InlineData("Asset strategy: provided; use only uploaded project assets.", VideoGameAssetProductionModes.Provided)]
+    [InlineData("Use procedural assets and code-native geometry.", VideoGameAssetProductionModes.Procedural)]
+    [InlineData("Asset strategy: generative with configured providers.", VideoGameAssetProductionModes.Generative)]
+    [InlineData("Use procedural and uploaded assets as a hybrid.", VideoGameAssetProductionModes.Hybrid)]
+    public void AssetStrategyPreferenceIsExplicitAndProjectScoped(string direction, string expected)
+    {
+        var preferences = VideoGameCreativeDirectorAgent.UpdateManagerPreferences(
+            new ManagerPreferenceProfile(), direction, Guid.NewGuid(), [], applyDefault: true);
+
+        Assert.Equal(expected, preferences.AssetStrategyPreference);
+    }
+
+    [Fact]
+    public void ThreeProjectAcceptanceProgramIsIsolatedAndGovernedThroughStabilization()
+    {
+        var scenarios = new[]
+        {
+            Scenario("Phaser microgame", "web browser Phaser 2D", VideoGameAssetProductionModes.Procedural,
+                VideoGameToolchainRecipeKeys.PhaserWeb2D, ["web"], 25_000m),
+            Scenario("Babylon microgame", "web browser Babylon 3D", VideoGameAssetProductionModes.Hybrid,
+                VideoGameToolchainRecipeKeys.BabylonWeb3D, ["web"], 35_000m),
+            Scenario("Godot puzzle", "Windows Linux native Godot 3D", VideoGameAssetProductionModes.Provided,
+                VideoGameToolchainRecipeKeys.GodotNative3DGdscript, ["windows-x64", "linux-x64"], 50_000m)
+        };
+
+        Assert.Equal(3, scenarios.Select(x => x.WorkstreamId).Distinct().Count());
+        Assert.Equal(3, scenarios.Select(x => x.TeamId).Distinct().Count());
+        Assert.Equal(3, scenarios.Select(x => x.BoardId).Distinct().Count());
+        Assert.Equal(3, scenarios.Select(x => x.RepositoryId).Distinct().Count());
+        Assert.Equal(3, scenarios.Select(x => x.StateKey).Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(3, scenarios.Select(x => x.Budget).Distinct().Count());
+        Assert.All(scenarios, scenario =>
+        {
+            Assert.Equal(scenario.ExpectedRecipe,
+                VideoGameCreativeDirectorAgent.DetermineRequiredRecipe(scenario.State));
+            Assert.Equal(14, VideoGameCreativeDirectorAgent.BuildRequiredStudioRoles(Guid.NewGuid())
+                .Select(x => x.RoleKey).Distinct(StringComparer.Ordinal).Count());
+        });
+
+        var milestones = VideoGameCreativeDirectorAgent.BuildLifecycleMilestones(DateTimeOffset.UtcNow);
+        var requiredStages = new[]
+        {
+            VideoGameLifecyclePhases.Concept, VideoGameLifecyclePhases.PreProduction,
+            VideoGameLifecyclePhases.Prototype, VideoGameLifecyclePhases.VerticalSlice,
+            VideoGameLifecyclePhases.Production, VideoGameLifecyclePhases.Alpha,
+            VideoGameLifecyclePhases.Beta, VideoGameLifecyclePhases.ReleaseCandidate,
+            VideoGameLifecyclePhases.Launch, VideoGameLifecyclePhases.PostLaunchStabilization
+        };
+        Assert.All(requiredStages, stage => Assert.Contains(milestones, x => x.LifecycleStage == stage));
+        var launch = Assert.Single(milestones, x => x.Key == VideoGameMilestoneKeys.LaunchApproved);
+        Assert.Equal(["human-owner"], launch.RequiredReviewerRoleKeys);
+        Assert.Contains("video-game.release-readiness.v1", launch.RequiredEvidenceTypeKeys);
+    }
+
+    private static AcceptanceScenario Scenario(string title, string direction, string strategy,
+        string recipe, IReadOnlyList<string> targets, decimal budget)
+    {
+        var workstreamId = Guid.NewGuid();
+        return new AcceptanceScenario(workstreamId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            VideoGameCreativeDirectorAgent.ProjectStateKey(workstreamId, null), budget, strategy, recipe, targets,
+            new CreativeDirectorOperatingState
+            {
+                WorkstreamId = workstreamId,
+                WorkingTitle = title,
+                ManagerPreferences = new ManagerPreferenceProfile
+                {
+                    PlatformConstraints = [direction],
+                    AssetStrategyPreference = strategy
+                }
+            });
+    }
+
+    private sealed record AcceptanceScenario(Guid WorkstreamId, Guid TeamId, Guid BoardId, Guid RepositoryId,
+        string StateKey, decimal Budget, string AssetStrategy, string ExpectedRecipe,
+        IReadOnlyList<string> Targets, CreativeDirectorOperatingState State);
 }

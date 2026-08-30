@@ -1,4 +1,5 @@
 using CSweet.Agent.SDK;
+using CSweet.VideoGame.Contracts;
 
 namespace CSweet.Agent.CreativeDirector.VideoGame;
 
@@ -8,8 +9,8 @@ public enum CreativeDirectorPhase
     InvolvementConfirmation = 1,
     HighLevelReview = 2,
     HighLevelAccepted = 3,
-    PMPlanPending = 4,
-    PMHiringPending = 5,
+    TeamPlanPending = 4,
+    TeamStaffingPending = 5,
     WorkstreamPlanPending = 6,
     ProjectSetup = 7,
     DetailedDesign = 8,
@@ -32,6 +33,7 @@ public sealed record ManagerPreferenceProfile
     public int InvolvementEvidenceCount { get; init; }
     public IReadOnlyList<string> PlatformConstraints { get; init; } = [];
     public IReadOnlyList<string> EnginePreferences { get; init; } = [];
+    public string? AssetStrategyPreference { get; init; }
     public IReadOnlyList<string> GenreConstraints { get; init; } = [];
     public IReadOnlyList<string> NarrativeConstraints { get; init; } = [];
     public string? StoryParticipation { get; init; }
@@ -116,10 +118,20 @@ public sealed record CreativeDirectorOperatingState
     public Guid? DetailedDesignPackageId { get; init; }
     public IReadOnlyList<ReferenceEvidence> References { get; init; } = [];
     public Guid? StaffingRequestId { get; init; }
-    public Guid? ProductManagerEmployeeId { get; init; }
+    public Guid? ProducerEmployeeId { get; init; }
+    public IReadOnlyDictionary<string, Guid> SpecialistEmployeeIds { get; init; } =
+        new Dictionary<string, Guid>(StringComparer.Ordinal);
     public Guid? WorkstreamProposalId { get; init; }
     public string? WorkingTitle { get; init; }
     public Guid? HandoffSessionId { get; init; }
+    public Guid? AssetStrategyDecisionId { get; init; }
+    public Guid? AssetStrategyBlockerDecisionId { get; init; }
+    public string? AssetStrategyMode { get; init; }
+    public Guid? ToolchainSelectionDecisionId { get; init; }
+    public Guid? ToolchainBlockerDecisionId { get; init; }
+    public string? SelectedToolchainRecipeKey { get; init; }
+    public Guid? ToolchainFeasibilitySessionId { get; init; }
+    public ToolchainFeasibilityEvidenceV1? ToolchainFeasibilityEvidence { get; init; }
     public IReadOnlyList<PendingCreativeEscalation> PendingEscalations { get; init; } = [];
     public IReadOnlyList<ManagementStatusReport> SubordinateReports { get; init; } = [];
     public IReadOnlyList<string> NotificationFingerprints { get; init; } = [];

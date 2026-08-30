@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <PackageId>CSweet.VideoGame.AgentKit</PackageId>
+    <Version>1.0.0</Version>
+    <Description>Shared, role-neutral project execution mechanics for C-Sweet video-game agents.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CSweet.Agent.SDK" Version="4.0.0" Condition="'$(UseLocalCSweetAgentSdk)' != 'true'" />
+    <PackageReference Include="CSweet.VideoGame.Contracts" Version="1.1.0" Condition="'$(UseLocalVideoGameContracts)' != 'true'" />
+    <ProjectReference Include="..\CSweet.VideoGame.Contracts\CSweet.VideoGame.Contracts.csproj" Condition="'$(UseLocalVideoGameContracts)' == 'true'" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseLocalCSweetAgentSdk)' == 'true'">
+    <ProjectReference Include="$(CSweetAgentSdkRepositoryRoot)\src\CSweet.Agent.SDK\CSweet.Agent.SDK.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

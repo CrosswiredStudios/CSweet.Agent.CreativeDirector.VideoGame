@@ -1,11 +1,11 @@
 # C-Sweet Video Game Creative Director
 
-Provide durable video game vision and creative leadership from discovery through pitch approval, product-manager handoff, and production oversight.
+Provide durable video game vision and creative leadership from discovery through pitch approval, dedicated-studio formation, certified-toolchain selection, and production oversight.
 
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.0.0`
+- Version: `1.1.0`
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`
@@ -21,7 +21,7 @@ source, install, spend, or claim that hiring is complete.
 
 ## Lifecycle
 
-`Discovery → PitchReview → VisionAccepted → PMPlanPending → PMHiringPending → VisionHandoff → Oversight`
+`Discovery → InvolvementConfirmation → HighLevelReview/HighLevelAccepted → TeamPlanPending → TeamStaffingPending → WorkstreamPlanPending → ProjectSetup → DetailedDesign → PackageReview → Oversight`
 
 Onboarding invites starting context and references without embedding a plain-text question. On the
 manager's first turn, the agent uses the platform's structured multiple-choice tool to choose
@@ -69,4 +69,4 @@ user/business memory, and supplied broker references. Explicit preferences and p
 may be proposed to governed memory immediately; inferred persona preferences are not persisted
 from a single observation and remain subject to platform approval.
 
-Built with `CSweet.Agent.SDK` 3.24.0, `CSweet.VideoGame.Contracts` 1.0.0, and `CSweet.Memory` 0.1.2.
+Built with `CSweet.Agent.SDK` 4.0.0, `CSweet.VideoGame.Contracts` 1.1.0, `CSweet.VideoGame.AgentKit` 1.0.0, and `CSweet.Memory` 0.1.2.

@@ -58,10 +58,15 @@
   },
   "milestones": [
     { "key": "vision-approved", "stage": "concept", "requiredEvidenceTypeKeys": ["video-game.vision.v1"], "requiredReviewerRoleKeys": ["creative-director", "game-producer"] },
+    { "key": "pre-production-ready", "stage": "pre-production", "requiredEvidenceTypeKeys": ["video-game.gdd.v1", "video-game.technical-design.v1", "video-game.production-plan.v1"], "requiredReviewerRoleKeys": ["game-producer", "game-technical-director", "creative-director"] },
     { "key": "prototype-validated", "stage": "prototype", "requiredEvidenceTypeKeys": ["video-game.runnable-build.v1", "video-game.playtest.v1"], "requiredReviewerRoleKeys": ["game-technical-director", "game-quality-assurance", "creative-director"] },
     { "key": "vertical-slice-approved", "stage": "vertical-slice", "requiredEvidenceTypeKeys": ["video-game.runnable-build.v1", "video-game.playtest.v1"], "requiredReviewerRoleKeys": ["creative-director", "game-producer", "game-technical-director", "game-quality-assurance"] },
+    { "key": "production-ready", "stage": "production", "requiredEvidenceTypeKeys": ["video-game.runnable-build.v1", "video-game.production-plan.v1"], "requiredReviewerRoleKeys": ["game-producer", "game-technical-director", "game-quality-assurance"] },
+    { "key": "alpha-exit", "stage": "alpha", "requiredEvidenceTypeKeys": ["video-game.runnable-build.v1", "video-game.qa-evaluation-plan.v1", "video-game.performance-evaluation.v1"], "requiredReviewerRoleKeys": ["game-quality-assurance", "game-technical-director", "game-producer"] },
+    { "key": "beta-exit", "stage": "beta", "requiredEvidenceTypeKeys": ["video-game.runnable-build.v1", "video-game.playtest.v1", "video-game.accessibility-evaluation.v1"], "requiredReviewerRoleKeys": ["game-quality-assurance", "playtest-researcher", "game-ui-ux-accessibility-designer", "creative-director"] },
     { "key": "release-candidate-approved", "stage": "release-candidate", "requiredEvidenceTypeKeys": ["video-game.runnable-build.v1", "video-game.platform-certification.v1", "video-game.release-plan.v1"], "requiredReviewerRoleKeys": ["game-build-release-engineer", "game-quality-assurance", "creative-director", "game-producer"] },
-    { "key": "launch-approved", "stage": "launch", "requiredEvidenceTypeKeys": ["video-game.release-readiness.v1"], "requiredReviewerRoleKeys": ["human-owner"] }
+    { "key": "launch-approved", "stage": "launch", "requiredEvidenceTypeKeys": ["video-game.release-readiness.v1"], "requiredReviewerRoleKeys": ["human-owner"] },
+    { "key": "stabilization-exit", "stage": "post-launch-stabilization", "requiredEvidenceTypeKeys": ["video-game.runnable-build.v1", "video-game.qa-evaluation-plan.v1"], "requiredReviewerRoleKeys": ["game-producer", "game-quality-assurance", "game-build-release-engineer"] }
   ],
   "workItemTypes": [
     { "key": "video-game.milestone.v1", "displayName": "Game milestone", "kind": "Epic", "permittedParentTypeKeys": [], "requiredApprovalPolicyKeys": [] },
@@ -77,6 +82,15 @@
   },
   "staffing": {
     "requiredRoleKeys": ["game-producer", "game-designer", "game-technical-director", "game-engineer", "game-quality-assurance", "playtest-researcher", "game-art-director", "game-artist", "technical-artist", "narrative-designer", "audio-designer", "level-designer", "game-ui-ux-accessibility-designer", "game-build-release-engineer"],
-    "conditionalRoleKeys": ["game-networking-engineer", "game-economy-designer", "game-localization-specialist", "game-security-privacy", "game-marketing-community", "game-platform-certification", "game-live-operations"]
+    "conditionalRoleKeys": ["game-networking-engineer", "game-economy-designer", "game-localization-specialist", "game-security-privacy", "game-marketing-community", "game-platform-certification", "game-live-operations"],
+    "conditionalRoles": [
+      { "roleKey": "game-networking-engineer", "predicate": { "jsonPath": "$.onlineMultiplayerExpected", "operator": "equals", "value": true }, "blockingDecisionTypeKey": "video-game.missing-conditional-specialist.v1" },
+      { "roleKey": "game-economy-designer", "predicate": { "jsonPath": "$.businessModel", "operator": "equals", "value": "free-to-play" }, "blockingDecisionTypeKey": "video-game.missing-conditional-specialist.v1" },
+      { "roleKey": "game-localization-specialist", "predicate": { "jsonPath": "$.localizationTargets", "operator": "array-not-empty", "value": true }, "blockingDecisionTypeKey": "video-game.missing-conditional-specialist.v1" },
+      { "roleKey": "game-security-privacy", "predicate": { "jsonPath": "$.onlineMultiplayerExpected", "operator": "equals", "value": true }, "blockingDecisionTypeKey": "video-game.missing-conditional-specialist.v1" },
+      { "roleKey": "game-marketing-community", "predicate": { "jsonPath": "$.liveOperationsExpected", "operator": "equals", "value": true }, "blockingDecisionTypeKey": "video-game.missing-conditional-specialist.v1" },
+      { "roleKey": "game-live-operations", "predicate": { "jsonPath": "$.liveOperationsExpected", "operator": "equals", "value": true }, "blockingDecisionTypeKey": "video-game.missing-conditional-specialist.v1" },
+      { "roleKey": "game-platform-certification", "predicate": { "jsonPath": "$.targetPlatforms", "operator": "contains-any", "value": ["console", "mobile"] }, "blockingDecisionTypeKey": "video-game.missing-conditional-specialist.v1" }
+    ]
   }
 }

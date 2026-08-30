@@ -45,6 +45,7 @@ public static class VideoGameMilestoneKeys
     public const string PreProductionReady = "pre-production-ready";
     public const string PrototypeValidated = "prototype-validated";
     public const string VerticalSliceApproved = "vertical-slice-approved";
+    public const string ProductionReady = "production-ready";
     public const string AlphaExit = "alpha-exit";
     public const string BetaExit = "beta-exit";
     public const string ReleaseCandidateApproved = "release-candidate-approved";
@@ -135,6 +136,49 @@ public static class VideoGameEvaluationTypeKeys
     public const string Certification = "video-game.platform-certification.v1";
 }
 
+public static class VideoGameDecisionTypeKeys
+{
+    public const string AssetStrategy = "video-game.asset-strategy.v1";
+    public const string ToolchainSelection = "video-game.toolchain-selection.v1";
+    public const string MissingConditionalSpecialist = "video-game.missing-conditional-specialist.v1";
+}
+
+public static class VideoGameAssetProductionModes
+{
+    public const string Provided = "provided";
+    public const string Procedural = "procedural";
+    public const string Generative = "generative";
+    public const string Hybrid = "hybrid";
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
+        { Provided, Procedural, Generative, Hybrid };
+}
+
+public sealed record VideoGameAssetStrategyV1(
+    string Mode,
+    IReadOnlyList<string> PermittedModes,
+    IReadOnlyList<Guid> ApprovedProviderInstallationIds,
+    IReadOnlyList<string> FallbackOrder,
+    decimal? BudgetAmount,
+    string? BudgetCurrency,
+    string QualityBar,
+    IReadOnlyList<string> LicensingConstraints,
+    bool ProceduralFallbackAllowed);
+
+public static class VideoGameToolchainRecipeKeys
+{
+    public const string PhaserWeb2D = "phaser.web-2d.v1";
+    public const string BabylonWeb3D = "babylon.web-3d.v1";
+    public const string GodotNative2DGdscript = "godot.native-2d.gdscript.v1";
+    public const string GodotNative3DGdscript = "godot.native-3d.gdscript.v1";
+}
+
+public sealed record ConditionalStaffingRuleV1(
+    string RoleKey,
+    string JsonPath,
+    string Operator,
+    JsonElement Value,
+    string BlockingDecisionTypeKey);
+
 public sealed record CreativeReviewRubric(
     string TypeKey,
     IReadOnlyList<CreativeReviewCriterion> Criteria,
@@ -157,6 +201,15 @@ public sealed record ToolchainRecommendationOption(
     IReadOnlyList<string> Tradeoffs,
     IReadOnlyList<string> Risks,
     bool Eligible);
+
+public sealed record ToolchainFeasibilityEvidenceV1(
+    string AcceptedVisionDigest,
+    string RecipeKey,
+    IReadOnlyList<string> TargetKeys,
+    bool Feasible,
+    IReadOnlyList<string> Findings,
+    IReadOnlyList<Guid> EvidenceResourceIds,
+    DateTimeOffset AssessedAt);
 
 public sealed record PlaytestPlanV1(
     string ResearchQuestion,

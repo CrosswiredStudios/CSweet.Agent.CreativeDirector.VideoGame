@@ -1,17 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CSweet.Agent.SDK" Version="3.24.0" Condition="'$(UseLocalCSweetAgentSdk)' != 'true'" />
+    <PackageReference Include="CSweet.Agent.SDK" Version="4.0.0" Condition="'$(UseLocalCSweetAgentSdk)' != 'true'" />
     <PackageReference Include="CSweet.Memory" Version="0.1.2" Condition="'$(UseLocalCSweetMemory)' != 'true'" />
     <PackageReference Include="CSweet.Memory.Broker" Version="0.1.2" Condition="'$(UseLocalCSweetMemory)' != 'true'" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="CSweet.Agent.CreativeDirector.VideoGame.Tests" />
-    <ProjectReference Include="..\CSweet.VideoGame.Contracts\CSweet.VideoGame.Contracts.csproj" />
+    <PackageReference Include="CSweet.VideoGame.Contracts" Version="1.1.0" Condition="'$(UseLocalVideoGameContracts)' != 'true'" />
+    <PackageReference Include="CSweet.VideoGame.AgentKit" Version="1.0.0" Condition="'$(UseLocalVideoGameAgentKit)' != 'true'" />
+    <ProjectReference Include="..\CSweet.VideoGame.Contracts\CSweet.VideoGame.Contracts.csproj" Condition="'$(UseLocalVideoGameContracts)' == 'true'" />
+    <ProjectReference Include="..\CSweet.VideoGame.AgentKit\CSweet.VideoGame.AgentKit.csproj" Condition="'$(UseLocalVideoGameAgentKit)' == 'true'" />
   </ItemGroup>
   <ItemGroup Condition="'$(UseLocalCSweetAgentSdk)' == 'true'">
     <ProjectReference Include="$(CSweetAgentSdkRepositoryRoot)\src\CSweet.Agent.SDK\CSweet.Agent.SDK.csproj" />
@@ -22,7 +25,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
-    <Content Include="..\..\csweet-plugin.json" Link="csweet-plugin.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\csweet-plugin.json" Link="csweet-plugin.json" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="content\" />
     <Content Include="..\..\profiles\video-game-production.v2.json" Link="profiles\video-game-production.v2.json"
              CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="content\profiles\" />
   </ItemGroup>

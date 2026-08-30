@@ -10,5 +10,10 @@
     <CSweetMemoryRepositoryRoot Condition="'$(CSweetMemoryRepositoryRoot)' == ''">$(MSBuildThisFileDirectory)..\CSweet.Memory</CSweetMemoryRepositoryRoot>
     <UseLocalCSweetMemory Condition="'$(UseLocalCSweetMemory)' == '' and Exists('$(CSweetMemoryRepositoryRoot)\src\CSweet.Memory\CSweet.Memory.csproj')">true</UseLocalCSweetMemory>
     <UseLocalCSweetMemory Condition="'$(UseLocalCSweetMemory)' == ''">false</UseLocalCSweetMemory>
+    <CSweetVideoGameRepositoryRoot Condition="'$(CSweetVideoGameRepositoryRoot)' == ''">$(MSBuildThisFileDirectory)</CSweetVideoGameRepositoryRoot>
+    <UseLocalVideoGameContracts Condition="'$(UseLocalVideoGameContracts)' == '' and Exists('$(CSweetVideoGameRepositoryRoot)\src\CSweet.VideoGame.Contracts\CSweet.VideoGame.Contracts.csproj')">true</UseLocalVideoGameContracts>
+    <UseLocalVideoGameContracts Condition="'$(UseLocalVideoGameContracts)' == ''">false</UseLocalVideoGameContracts>
+    <UseLocalVideoGameAgentKit Condition="'$(UseLocalVideoGameAgentKit)' == '' and Exists('$(CSweetVideoGameRepositoryRoot)\src\CSweet.VideoGame.AgentKit\CSweet.VideoGame.AgentKit.csproj')">true</UseLocalVideoGameAgentKit>
+    <UseLocalVideoGameAgentKit Condition="'$(UseLocalVideoGameAgentKit)' == ''">false</UseLocalVideoGameAgentKit>
   </PropertyGroup>
 </Project>
