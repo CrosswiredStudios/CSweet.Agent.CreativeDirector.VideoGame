@@ -28,7 +28,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.1.0";
+    public override string Version => "1.1.1";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -454,6 +454,18 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             current = await SaveStateAsync(state, current.Revision, Guid.NewGuid(),
                 $"manager-preferences:{incoming.MessageId:N}", context, cancellationToken);
             state = current.State;
+        }
+
+        if (state.Phase == CreativeDirectorPhase.InvolvementConfirmation &&
+            state.ManagerPreferences.InvolvementWasExplicit &&
+            IsInteractionPreferenceOnly(currentMessage, incoming.Attachments))
+        {
+            await stream.CommitAsync(
+                $"Got it—I recorded {DescribeInvolvementMode(state.ManagerPreferences.InvolvementMode)} mode. " +
+                "Send your initial game direction or reference files when ready, or tell me to propose starting concepts. " +
+                "Helpful starting points are the player fantasy, core loop, genre and tone, target platform, and any non-negotiables; I’ll own everything you leave unspecified.",
+                cancellationToken);
+            return;
         }
 
         if (state.Phase == CreativeDirectorPhase.HighLevelReview && IsVisionLock(currentMessage) && state.Proposals.Count > 0)
@@ -2288,6 +2300,31 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         if (ContainsAny(message, "selected option: milestone-review", "review major milestones", "review milestones", "milestone review"))
             return ManagerInvolvementMode.MilestoneReview;
         return ManagerInvolvementMode.Unspecified;
+    }
+
+    internal static bool IsInteractionPreferenceOnly(
+        string message,
+        IReadOnlyList<CommunicationAttachment> attachments)
+    {
+        if (attachments.Count > 0 || ParseInvolvementMode(message) == ManagerInvolvementMode.Unspecified)
+            return false;
+
+        var remaining = Regex.Replace(message, @"(?im)^\s*Decision:.*(?:\r?\n|$)", " ");
+        remaining = Regex.Replace(remaining, @"(?im)^\s*Answer:\s*", " ");
+        remaining = Regex.Replace(remaining,
+            @"(?i)\b(?:selected\s+option:\s*)?(?:milestone-review|review\s+(?:major\s+)?milestones?|milestone\s+review|delegate(?:d)?\s+(?:unspecified\s+)?decisions?|collaborate\s+closely|collaborative|work\s+together|hands?-off|be\s+autonomous|you\s+decide)\b",
+            " ");
+
+        var interactionWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "a", "about", "all", "and", "at", "be", "creative", "decision", "decisions", "direction",
+            "do", "for", "how", "i", "initial", "interaction", "involved", "just", "let", "me", "mode",
+            "my", "of", "only", "please", "set", "setting", "style", "the", "then", "to", "want", "will",
+            "with", "you"
+        };
+        var words = Regex.Matches(remaining, @"[\p{L}\p{N}]+")
+            .Select(match => match.Value);
+        return words.All(interactionWords.Contains);
     }
 
     internal static string? ParseAssetStrategyPreference(string message)

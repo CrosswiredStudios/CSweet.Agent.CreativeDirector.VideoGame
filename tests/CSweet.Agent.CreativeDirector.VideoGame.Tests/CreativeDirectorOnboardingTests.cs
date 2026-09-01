@@ -244,7 +244,7 @@ public sealed class CreativeDirectorOnboardingTests
     }
 
     [Fact]
-    public async Task InvolvementAnswerIsDurableAndReturnsRecoverableResponseWhenModelIsUnavailable()
+    public async Task InvolvementOnlyAnswerIsDurableAndAcknowledgedWithoutInvokingTheModel()
     {
         var organizationId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -307,7 +307,9 @@ public sealed class CreativeDirectorOnboardingTests
         Assert.True(state.ManagerPreferences.InvolvementWasExplicit);
         var response = Assert.Single(runtime.Progress,
             progress => progress.GetProperty("kind").GetString() == AgentTurnStreamKinds.FinalCommit);
-        Assert.Contains("choice will not be lost", response.GetProperty("delta").GetString(),
+        Assert.Contains("recorded milestone-review mode", response.GetProperty("delta").GetString(),
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("initial game direction", response.GetProperty("delta").GetString(),
             StringComparison.OrdinalIgnoreCase);
     }
 }

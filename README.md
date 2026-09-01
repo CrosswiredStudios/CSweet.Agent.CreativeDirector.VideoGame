@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.1.0`
+- Version: `1.1.1`
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`
@@ -27,7 +27,9 @@ Onboarding invites starting context and references without embedding a plain-tex
 manager's first turn, the agent uses the platform's structured multiple-choice tool to choose
 delegated decisions, milestone review, or close collaboration. Manager decisions use 2–4 concrete
 options with one recommendation instead of open-ended questions whenever an active chat turn is
-available. The agent does not submit staffing until that choice is recorded. PNG, JPEG, WebP, PDF, UTF-8 text, and Markdown
+available. A mode-only answer is persisted and acknowledged without invoking the model or document
+toolchain; pitch production begins after the manager supplies creative direction, references, or asks
+the Creative Director to originate concepts. The agent does not submit staffing until that choice is recorded. PNG, JPEG, WebP, PDF, UTF-8 text, and Markdown
 references are passed to the configured model through opaque, broker-validated media references;
 operating state and memory retain metadata and digests only, never raw files or private paths.
 

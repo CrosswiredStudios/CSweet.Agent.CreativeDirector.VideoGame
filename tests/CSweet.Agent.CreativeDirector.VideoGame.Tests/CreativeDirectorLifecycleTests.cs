@@ -185,6 +185,14 @@ public sealed class CreativeDirectorLifecycleTests
         Assert.Equal(expected, VideoGameCreativeDirectorAgent.ParseInvolvementMode(message));
 
     [Theory]
+    [InlineData("Decision: How involved do you want to be in creative direction?\nAnswer: Review milestones", true)]
+    [InlineData("I just want to set the initial direction and then review milestones.", true)]
+    [InlineData("Review milestones for a cozy horror game about restoring a flooded city.", false)]
+    [InlineData("Collaborate closely on a PC strategy game.", false)]
+    public void InteractionOnlyRepliesDoNotStartPitchProduction(string message, bool expected) =>
+        Assert.Equal(expected, VideoGameCreativeDirectorAgent.IsInteractionPreferenceOnly(message, []));
+
+    [Theory]
     [InlineData(ManagerInvolvementMode.Delegated, "LockAndStaff")]
     [InlineData(ManagerInvolvementMode.MilestoneReview, "AwaitExplicitMilestoneApproval")]
     [InlineData(ManagerInvolvementMode.Collaborative, "IterateCollaboratively")]
