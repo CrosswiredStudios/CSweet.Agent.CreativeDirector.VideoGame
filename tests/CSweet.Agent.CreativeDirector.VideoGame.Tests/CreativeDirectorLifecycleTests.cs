@@ -192,6 +192,28 @@ public sealed class CreativeDirectorLifecycleTests
     public void InteractionOnlyRepliesDoNotStartPitchProduction(string message, bool expected) =>
         Assert.Equal(expected, VideoGameCreativeDirectorAgent.IsInteractionPreferenceOnly(message, []));
 
+    [Fact]
+    public void PitchGenerationFailuresAreRecoverableUnlessTheWorkItemWasCancelled()
+    {
+        Assert.True(VideoGameCreativeDirectorAgent.IsRecoverablePitchGenerationFailure(
+            new HttpRequestException("transport failed"), CancellationToken.None));
+        Assert.True(VideoGameCreativeDirectorAgent.IsRecoverablePitchGenerationFailure(
+            new TimeoutException("model timed out"), CancellationToken.None));
+        Assert.True(VideoGameCreativeDirectorAgent.IsRecoverablePitchGenerationFailure(
+            new OperationCanceledException("request timeout"), CancellationToken.None));
+        Assert.True(VideoGameCreativeDirectorAgent.IsRecoverablePitchGenerationFailure(
+            new PlatformCapabilityException(
+                PlatformCapabilities.LlmChatStream,
+                PlatformCapabilityErrorCode.Unavailable,
+                "model unavailable"),
+            CancellationToken.None));
+
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        Assert.False(VideoGameCreativeDirectorAgent.IsRecoverablePitchGenerationFailure(
+            new OperationCanceledException(cancelled.Token), cancelled.Token));
+    }
+
     [Theory]
     [InlineData(ManagerInvolvementMode.Delegated, "LockAndStaff")]
     [InlineData(ManagerInvolvementMode.MilestoneReview, "AwaitExplicitMilestoneApproval")]

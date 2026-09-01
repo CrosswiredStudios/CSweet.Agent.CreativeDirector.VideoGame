@@ -1,11 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <Version>1.1.1</Version>
+    <Version>1.1.2</Version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CSweet.Agent.SDK" Version="3.24.0" Condition="'$(UseLocalCSweetAgentSdk)' != 'true'" />
+    <PackageReference Include="CSweet.Agent.SDK" Version="3.24.1" Condition="'$(UseLocalCSweetAgentSdk)' != 'true'" />
     <PackageReference Include="CSweet.Memory" Version="0.1.2" Condition="'$(UseLocalCSweetMemory)' != 'true'" />
     <PackageReference Include="CSweet.Memory.Broker" Version="0.1.2" Condition="'$(UseLocalCSweetMemory)' != 'true'" />
   </ItemGroup>

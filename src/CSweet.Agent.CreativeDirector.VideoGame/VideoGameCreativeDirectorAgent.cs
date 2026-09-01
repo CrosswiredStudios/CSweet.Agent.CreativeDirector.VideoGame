@@ -28,7 +28,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.1.1";
+    public override string Version => "1.1.2";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -538,11 +538,11 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 pitch = await GeneratePitchAsync(incoming, currentMessage, state,
                     conversationId, context, cancellationToken);
             }
-            catch (PlatformCapabilityException exception) when (
-                exception.Capability == PlatformCapabilities.LlmChatStream)
+            catch (Exception exception) when (
+                IsRecoverablePitchGenerationFailure(exception, cancellationToken))
             {
                 await stream.CommitAsync(
-                    $"I recorded your {DescribeInvolvementMode(state.ManagerPreferences.InvolvementMode)} involvement preference, but the configured model could not generate the high-level game vision. Check the Creative Director's LLM provider and retry; your choice will not be lost.",
+                    $"Your game direction and {DescribeInvolvementMode(state.ManagerPreferences.InvolvementMode)} involvement preference are saved, but the configured model timed out or was unavailable while generating the high-level vision. Retry this direction after checking the Creative Director's LLM provider; you do not need to re-enter it.",
                     cancellationToken);
                 return;
             }
@@ -682,7 +682,15 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         var response = await client.GetResponseAsync([
             new ChatMessage(ChatRole.System, SystemPrompt),
             new ChatMessage(ChatRole.User, contents)
-        ], cancellationToken: cancellationToken);
+        ], new ChatOptions
+        {
+            Temperature = 0.7f,
+            MaxOutputTokens = 1_024,
+            Reasoning = new ReasoningOptions
+            {
+                Effort = ReasoningEffort.Low
+            }
+        }, cancellationToken);
         return string.IsNullOrWhiteSpace(response.Text)
             ? throw new InvalidOperationException("The configured model returned an empty game pitch.")
             : response.Text;
@@ -2302,6 +2310,18 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         return ManagerInvolvementMode.Unspecified;
     }
 
+    internal static bool IsRecoverablePitchGenerationFailure(
+        Exception exception,
+        CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
+            return false;
+
+        return exception is HttpRequestException or TimeoutException or OperationCanceledException ||
+               exception is PlatformCapabilityException platformException &&
+               platformException.Capability == PlatformCapabilities.LlmChatStream;
+    }
+
     internal static bool IsInteractionPreferenceOnly(
         string message,
         IReadOnlyList<CommunicationAttachment> attachments)
@@ -2446,6 +2466,7 @@ After the vision is locked, propose one dedicated project team with 14 distinct 
 Record an explicit durable asset-strategy decision for every project. Select Phaser only for 2D web games, Babylon.js only for 3D web games, and Godot for 2D or 3D native games. Select only eligible certified adapter definitions and require exact Technical Director feasibility evidence first.
 
 Produce one executive-readable game pitch in Markdown containing every heading below:
+Keep the entire pitch under 650 words, use concise bullets, and return only the pitch without hidden reasoning or process narration.
 1. Working title and player promise
 2. Target players and platforms
 3. Genre and perspective
