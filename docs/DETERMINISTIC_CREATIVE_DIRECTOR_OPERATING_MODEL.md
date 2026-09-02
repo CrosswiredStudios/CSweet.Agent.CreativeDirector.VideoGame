@@ -1,6 +1,6 @@
 # Deterministic Creative Director Operating Model
 
-**Status:** Version 1.2.5 implementation baseline and forward design
+**Status:** Version 1.2.6 implementation baseline and forward design
 **Scope:** `CSweet.Agent.CreativeDirector.VideoGame`  
 **Purpose:** Define an inspectable, partially deterministic operating model for a video game Creative Director agent from initial hire through concurrent project supervision, launch, live operations, expansions, sequels, and closure.
 
@@ -21,7 +21,7 @@ The goal is not deterministic creative output. The goal is deterministic intent,
 
 ## 2. Current-state assessment
 
-Version 1.2.5 establishes the current executable slice of this model. The agent now has:
+Version 1.2.6 establishes the current executable slice of this model. The agent now has:
 
 - An explicit Creative Director lifecycle.
 - Exact artifact revisions and hashes.
@@ -1240,7 +1240,7 @@ Implementation tests should cover at least:
 
 The Creative Director should depend only on the typed SDK and granted platform capabilities. These platform sources are behavioral references for implementation and test design, not direct dependencies.
 
-## 17. Version 1.2.5 implementation boundary
+## 17. Version 1.2.6 implementation boundary
 
 The current implementation intentionally delivers a safe vertical slice rather than pretending the
 entire target operating model is complete.
@@ -1260,6 +1260,12 @@ Implemented now:
   it is moving on. The approval callback does not submit staffing invisibly. The claimed card owns
   the 14-role proposal, stores the governed request ID, and then completes; transient dependency
   failure defers the visible card and missing authority blocks it with an actionable reason.
+- The staffing payload is contract-tested against the resource-change envelope, including its
+  32-character role-timing limit. Schema and validation failures block the card with the exact
+  corrective reason instead of being mislabeled as temporary outages.
+- Internally scheduled portfolio-review cards carry project identity in stable correlation and
+  description fields. They omit chat source IDs because the platform requires conversation and
+  message IDs as an authenticated pair; this keeps attention-review recovery deliverable.
 - Pitch review uses the revisioned document as its only decision record. The document viewer and
   Communications quick-approve action both decide the exact submitted revision; no duplicate
   multiple-choice widget is created. Human document decisions emit a targeted typed event so the

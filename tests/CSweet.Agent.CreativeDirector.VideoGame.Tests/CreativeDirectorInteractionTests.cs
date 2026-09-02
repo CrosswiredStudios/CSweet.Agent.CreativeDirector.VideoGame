@@ -71,6 +71,20 @@ public sealed class CreativeDirectorInteractionTests
     }
 
     [Fact]
+    public void StaffingSchemaRejectionIsActionableRatherThanTransient()
+    {
+        Assert.False(VideoGameCreativeDirectorAgent.IsRecoverableStaffingFailure(
+            new InvalidOperationException("JSON Schema validation failed: $.roles[0].timing is too long."),
+            CancellationToken.None));
+        Assert.True(VideoGameCreativeDirectorAgent.IsRecoverableStaffingFailure(
+            new PlatformCapabilityException(
+                PlatformCapabilities.ResourceChangePropose,
+                PlatformCapabilityErrorCode.Unavailable,
+                "Temporarily unavailable."),
+            CancellationToken.None));
+    }
+
+    [Fact]
     public async Task AcceptedVisionCompletesItsDurablePersonalCard()
     {
         var conversationId = Guid.NewGuid();
@@ -175,7 +189,8 @@ public sealed class CreativeDirectorInteractionTests
         Assert.NotNull(captured);
         Assert.Equal($"creative-project-review:{conversationId:N}", captured.IdempotencyKey);
         Assert.Equal(CreativeDirectorAgenda.ProjectReviewCorrelation(conversationId), captured.CorrelationId);
-        Assert.Equal(conversationId, captured.SourceConversationId);
+        Assert.Null(captured.SourceConversationId);
+        Assert.Null(captured.SourceMessageId);
     }
 
     [Fact]

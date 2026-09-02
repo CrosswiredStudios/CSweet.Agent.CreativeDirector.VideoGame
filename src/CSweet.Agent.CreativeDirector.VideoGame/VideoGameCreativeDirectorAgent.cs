@@ -28,7 +28,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.2.5";
+    public override string Version => "1.2.6";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -266,16 +266,20 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                     item.Id, context, cancellationToken, current.State, current.Revision,
                     allowStaffingProposal: true);
             }
-            catch (Exception exception) when (IsRecoverableAgendaFailure(exception, cancellationToken))
+            catch (Exception exception) when (IsRecoverableStaffingFailure(exception, cancellationToken))
             {
                 return PersonalTodoResult.WaitingUntil(
                     DateTimeOffset.UtcNow.AddMinutes(15),
                     $"Staffing-plan submission is waiting on a temporarily unavailable platform dependency: {exception.Message}");
             }
-            catch (PlatformCapabilityException exception)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
             {
                 return PersonalTodoResult.Blocked(
-                    $"Staffing-plan submission cannot complete with the current platform authority: {exception.Message}");
+                    $"Staffing-plan submission was rejected and requires correction: {exception.Message}");
             }
 
             current = await ReadStateForConversationAsync(
@@ -1289,6 +1293,15 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                platform.Capability == PlatformCapabilities.LlmChatStream;
     }
 
+    internal static bool IsRecoverableStaffingFailure(Exception exception, CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested) return false;
+        if (exception is HttpRequestException or TimeoutException or OperationCanceledException) return true;
+        return exception is PlatformCapabilityException platform &&
+               (platform.Retryable == true ||
+                platform.Code is PlatformCapabilityErrorCode.Unavailable or PlatformCapabilityErrorCode.Conflict);
+    }
+
     private async Task ReconcileAsync(
         Guid reviewId,
         AgentRuntimeContext context,
@@ -2204,7 +2217,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             Guid creativeDirectorId,
             bool producer = false) =>
             new(key, "video-game-team", title, purpose, 1, priority,
-                "Immediately after vision acceptance", [capability], false,
+                "Immediate", [capability], false,
                 producer ? creativeDirectorId : null,
                 producer ? null : VideoGameRoleKeys.Producer)
             {
@@ -2365,7 +2378,6 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 entry.Phase == CreativeDirectorPhase.Oversight ? WorkPriorities.Medium : WorkPriorities.High,
                 null,
                 $"creative-project-review:{entry.ConversationId:N}",
-                SourceConversationId: entry.ConversationId,
                 CorrelationId: CreativeDirectorAgenda.ProjectReviewCorrelation(entry.ConversationId)),
                 cancellationToken);
         }
