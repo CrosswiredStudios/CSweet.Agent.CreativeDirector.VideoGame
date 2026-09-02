@@ -28,7 +28,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.2.2";
+    public override string Version => "1.2.4";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -63,6 +63,12 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         if (string.Equals(message.EventType, WorkstreamEventNames.DecisionDecidedV1, StringComparison.Ordinal))
         {
             await HandleDecisionDecidedAsync(message, context, cancellationToken);
+            return;
+        }
+
+        if (string.Equals(message.EventType, WorkstreamEventNames.ArtifactRevisionDecidedV1, StringComparison.Ordinal))
+        {
+            await HandleArtifactRevisionDecidedAsync(message, context, cancellationToken);
             return;
         }
 
@@ -696,6 +702,8 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         if (state.Phase is CreativeDirectorPhase.Discovery or CreativeDirectorPhase.InvolvementConfirmation or CreativeDirectorPhase.HighLevelReview)
         {
             var references = state.References;
+            var revision = state.Proposals.Count == 0 ? 1 : state.Proposals.Max(x => x.Revision) + 1;
+            await PublishPitchWorkAcknowledgementAsync(stream, revision, cancellationToken);
             string pitch;
             try
             {
@@ -710,7 +718,6 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                     cancellationToken);
                 return;
             }
-            var revision = state.Proposals.Count == 0 ? 1 : state.Proposals.Max(x => x.Revision) + 1;
             var digest = Digest(pitch);
             var disposition = InitialVisionDisposition(state.ManagerPreferences.InvolvementMode);
             var delegated = disposition == "LockAndStaff";
@@ -792,6 +799,8 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 HighLevelArtifactId = document.Id,
                 HighLevelLatestRevisionId = latestArtifactRevision.Id,
                 HighLevelAcceptedRevisionId = artifactAccepted ? latestArtifactRevision.Id : state.HighLevelAcceptedRevisionId,
+                HighLevelSourceTurnId = incoming.TurnId,
+                HighLevelSourceMessageId = incoming.MessageId,
                 AcceptedVision = artifactAccepted
                     ? new AcceptedGameVision(
                         revision, digest, latestArtifactRevision.Content,
@@ -800,11 +809,6 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                         incoming.TurnId, incoming.MessageId, DateTimeOffset.UtcNow)
                     : state.AcceptedVision
             };
-            if (!delegated)
-            {
-                _ = await context.Platform.AskUserAsync(BuildPitchReviewRequest(
-                    conversationId, incoming.TurnId, revision, digest), cancellationToken);
-            }
             var saved = await SaveStateAsync(state, current.Revision, Guid.NewGuid(),
                 $"pitch-revision:{digest}", context, cancellationToken);
             await stream.CommitAsync(BuildPitchReviewMessage(revision), cancellationToken);
@@ -2759,20 +2763,130 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     private static bool ContainsAny(string value, params string[] candidates) =>
         candidates.Any(x => value.Contains(x, StringComparison.OrdinalIgnoreCase));
 
-    internal static AskUserRequest BuildPitchReviewRequest(
-        Guid conversationId, Guid turnId, int revision, string digest) =>
-        new(conversationId, turnId,
-            revision == 1 ? "Review the first game pitch draft." : $"Review game pitch revision {revision}.",
-            [
-                new("accept", "Accept", "Lock this exact document revision as the authoritative game vision."),
-                new("revise", "Request changes", "Keep the draft in review and tell the Creative Director what to revise.")
-            ],
-            "accept", $"pitch-decision:{digest}");
+    internal static string BuildPitchWorkAcknowledgement(int revision) =>
+        revision == 1
+            ? "Perfect—I can work with that. I’m going to start creating the first draft of the game pitch now."
+            : "Got it—I can work with that feedback. I’m going to start revising the game pitch now.";
+
+    internal static async Task PublishPitchWorkAcknowledgementAsync(
+        AgentTurnStreamWriter stream, int revision, CancellationToken cancellationToken)
+    {
+        await stream.WriteDraftAsync(BuildPitchWorkAcknowledgement(revision), cancellationToken);
+        await stream.FlushAsync(cancellationToken);
+    }
+
+    private async Task HandleArtifactRevisionDecidedAsync(
+        AgentEventEnvelope message,
+        AgentRuntimeContext context,
+        CancellationToken cancellationToken)
+    {
+        var resourceEvent = DeserializePayload<GenericResourceEvent>(message.Data);
+        if (resourceEvent is null ||
+            !string.Equals(resourceEvent.AggregateType, "ArtifactRevision", StringComparison.OrdinalIgnoreCase) ||
+            !TryGetMetadataGuid(resourceEvent.Metadata, "artifactId", out var artifactId))
+            return;
+
+        Guid? conversationId = TryGetMetadataGuid(
+            resourceEvent.Metadata, "originConversationId", out var parsedConversationId)
+            ? parsedConversationId
+            : null;
+        var current = resourceEvent.Context.WorkstreamId != Guid.Empty
+            ? await ReadStateAsync(context, cancellationToken, resourceEvent.Context.WorkstreamId)
+            : await ReadStateForConversationAsync(conversationId, context, cancellationToken);
+        var state = current.State;
+        if (state.Phase != CreativeDirectorPhase.HighLevelReview ||
+            state.HighLevelArtifactId != artifactId ||
+            state.HighLevelLatestRevisionId != resourceEvent.AggregateId ||
+            state.Proposals.Count == 0 ||
+            !state.IntakeConversationId.HasValue)
+            return;
+
+        var accepted = resourceEvent.Action.Equals("accepted", StringComparison.OrdinalIgnoreCase);
+        if (!accepted)
+        {
+            if (resourceEvent.Action is not ("changes-required" or "rejected")) return;
+            var comment = TryGetMetadataString(resourceEvent.Metadata, "comment");
+            var updated = string.IsNullOrWhiteSpace(comment)
+                ? state
+                : state with
+                {
+                    DiscoveryInputs = state.DiscoveryInputs.Append($"Revision feedback: {comment.Trim()}")
+                        .Distinct(StringComparer.OrdinalIgnoreCase).TakeLast(20).ToList()
+                };
+            await SaveStateAsync(updated, current.Revision, message.EventId,
+                $"vision-changes-requested:{resourceEvent.AggregateId:N}", context, cancellationToken);
+            await context.Platform.Communication.SendMessageAsync(
+                state.IntakeConversationId.Value,
+                string.IsNullOrWhiteSpace(comment)
+                    ? "I recorded the request for changes to the game pitch. Send the direction you want changed, and I’ll prepare the next revision."
+                    : $"I recorded your requested changes to the game pitch: {comment.Trim()} Send any additional context here, or tell me to proceed with that feedback, and I’ll prepare the next revision.",
+                $"vision-changes-confirmed:{resourceEvent.AggregateId:N}",
+                cancellationToken);
+            return;
+        }
+
+        ArtifactDocument document;
+        try
+        {
+            document = await context.Platform.Artifacts.GetAsync(artifactId, cancellationToken);
+        }
+        catch (PlatformCapabilityException exception) when (
+            exception.Code is PlatformCapabilityErrorCode.Denied or PlatformCapabilityErrorCode.NotFound)
+        {
+            return;
+        }
+        var exact = document.Revisions.SingleOrDefault(x => x.Id == resourceEvent.AggregateId);
+        if (exact is null || !exact.Status.Equals("Accepted", StringComparison.OrdinalIgnoreCase)) return;
+
+        var latest = state.Proposals.MaxBy(x => x.Revision)!;
+        state = state with
+        {
+            Phase = CreativeDirectorPhase.HighLevelAccepted,
+            HighLevelAcceptedRevisionId = exact.Id,
+            AcceptedVision = new AcceptedGameVision(
+                latest.Revision,
+                latest.Digest,
+                exact.Content,
+                artifactId,
+                exact.Id,
+                exact.ContentSha256,
+                state.IntakeConversationId.Value,
+                state.HighLevelSourceTurnId ?? resourceEvent.EventId,
+                state.HighLevelSourceMessageId ?? message.EventId,
+                DateTimeOffset.UtcNow)
+        };
+        var saved = await SaveStateAsync(state, current.Revision, message.EventId,
+            $"vision-accepted:{exact.Id:N}:{exact.ContentSha256}", context, cancellationToken);
+        if (saved.State.VisionTodoId.HasValue)
+            await TryRequeuePersonalTodoAsync(saved.State.VisionTodoId.Value, context, cancellationToken);
+        await context.Platform.Communication.SendMessageAsync(
+            state.IntakeConversationId.Value,
+            $"I recorded your approval of game pitch revision {latest.Revision}. The vision is locked, and I’m moving on to the governed studio staffing plan.",
+            $"vision-accepted-confirmed:{exact.Id:N}",
+            cancellationToken);
+        await ReconcileAsync(message.EventId, context, cancellationToken, saved.State, saved.Revision);
+    }
 
     internal static string BuildPitchReviewMessage(int revision) =>
         $"I created {(revision == 1 ? "the first draft" : $"revision {revision}")} of the game pitch and submitted it for your review. " +
-        "Open the attached document, then accept it or request changes below. " +
+        "Open the attached document to review it, or use its More menu for quick approval. " +
         "I’ll wait for your decision before continuing.";
+
+    private static bool TryGetMetadataGuid(JsonElement metadata, string propertyName, out Guid value)
+    {
+        value = Guid.Empty;
+        return metadata.ValueKind == JsonValueKind.Object &&
+               metadata.TryGetProperty(propertyName, out var property) &&
+               property.ValueKind == JsonValueKind.String &&
+               property.TryGetGuid(out value);
+    }
+
+    private static string? TryGetMetadataString(JsonElement metadata, string propertyName) =>
+        metadata.ValueKind == JsonValueKind.Object &&
+        metadata.TryGetProperty(propertyName, out var property) &&
+        property.ValueKind == JsonValueKind.String
+            ? property.GetString()
+            : null;
 
     private static bool IsExplicitRejection(string value) =>
         value.Contains("replace", StringComparison.OrdinalIgnoreCase) ||

@@ -1,6 +1,6 @@
 # Deterministic Creative Director Operating Model
 
-**Status:** Version 1.2.2 implementation baseline and forward design
+**Status:** Version 1.2.4 implementation baseline and forward design
 **Scope:** `CSweet.Agent.CreativeDirector.VideoGame`  
 **Purpose:** Define an inspectable, partially deterministic operating model for a video game Creative Director agent from initial hire through concurrent project supervision, launch, live operations, expansions, sequels, and closure.
 
@@ -21,7 +21,7 @@ The goal is not deterministic creative output. The goal is deterministic intent,
 
 ## 2. Current-state assessment
 
-Version 1.2.2 establishes the current executable slice of this model. The agent now has:
+Version 1.2.4 establishes the current executable slice of this model. The agent now has:
 
 - An explicit Creative Director lifecycle.
 - Exact artifact revisions and hashes.
@@ -429,10 +429,19 @@ Exploration remains non-authoritative until an exact revision is accepted. Conve
 The high-level pitch review is a single bounded interaction, not an agent-to-agent review loop:
 
 1. The Creative Director asks for the game description or receives an originating mandate.
-2. It creates and submits one exact pitch revision, assigns the authoritative manager as steward and reviewer, and remains in `HighLevelReview`.
-3. The platform attaches that exact revision to one concise Creative Director message. The same message presents only **Accept** and **Request changes**.
-4. The Creative Director does not send another message or create another revision until the manager answers.
-5. **Accept** locks the exact revision and advances the lifecycle. **Request changes** keeps the revision unaccepted, collects bounded feedback, and only then produces the next revision.
+2. As soon as it classifies the input as sufficient pitch direction, it publishes a concise, human acknowledgement in the active turn so the manager knows what work has started.
+3. That acknowledgement is provisional progress, not a second durable chat message. The final commit replaces it when the document is ready.
+4. It creates and submits one exact pitch revision, assigns the authoritative manager as steward and reviewer, and remains in `HighLevelReview`.
+5. The platform attaches that exact revision to one concise Creative Director message. It does not add a second `ask_user` decision card.
+6. The document workspace is the canonical review surface for **Accept revision** and **Request changes**. The attachment's More menu may expose **Approve linked revision**, but it calls the same exact-revision document decision endpoint.
+7. The Creative Director does not send another message or create another revision until the manager records a document decision.
+8. The platform emits the exact revision decision to the creating agent. The agent verifies artifact ID, revision ID, accepted status, and conversation/workstream correlation before advancing.
+9. **Accept** locks the exact revision and advances the lifecycle. **Request changes** keeps the revision unaccepted, preserves the decision comment as revision input, and waits for explicit chat direction before producing the next revision.
+
+The viewer and shortcut are projections of one decision record. They must never maintain separate
+accepted states, and an old attachment must never approve a newer revision implicitly. Convenience
+approval therefore carries the attachment's exact `revisionId`; conflicts direct the user to the
+document workspace instead of guessing or retrying against “latest.”
 
 Submitting a human-reviewed document must not enqueue an agent review turn. Submitting an artifact to its creator must never enqueue self-review. When a real agent is the reviewer, the system message must have an authenticated sender and render as C-Sweet system activity rather than `Unknown`. These platform rules prevent synthetic notifications from being mistaken for CEO instructions.
 
@@ -1221,7 +1230,7 @@ Implementation tests should cover at least:
 
 The Creative Director should depend only on the typed SDK and granted platform capabilities. These platform sources are behavioral references for implementation and test design, not direct dependencies.
 
-## 17. Version 1.2.2 implementation boundary
+## 17. Version 1.2.4 implementation boundary
 
 The current implementation intentionally delivers a safe vertical slice rather than pretending the
 entire target operating model is complete.
@@ -1237,6 +1246,10 @@ Implemented now:
   the source conversation.
 - Vision work is correlated to its source project and remains visibly waiting until its exact
   accepted revision exists.
+- Pitch review uses the revisioned document as its only decision record. The document viewer and
+  Communications quick-approve action both decide the exact submitted revision; no duplicate
+  multiple-choice widget is created. Human document decisions emit a targeted typed event so the
+  Creative Director can verify the revision, lock the vision, and resume its durable agenda.
 - Attention review reconciles all indexed projects and ensures one stable portfolio-review card for
   each. The card covers delivery, launch, live operations, updates, expansions, DLC, and sequel
   recommendation; it waits four hours between active-development reviews and one day during ongoing

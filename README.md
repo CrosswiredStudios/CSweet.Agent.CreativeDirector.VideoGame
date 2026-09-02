@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.2.2`
+- Version: `1.2.4`
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`
@@ -35,10 +35,15 @@ operating state and memory retain metadata and digests only, never raw files or 
 
 Delegated mode lets the Creative Director lock the initial vision and submit the PM plan on the
 manager's first substantive turn. In review modes, each pitch revision produces exactly one concise
-Creative Director message with the exact submitted document attached and one **Accept** or
-**Request changes** decision. The agent remains in `HighLevelReview` and emits no autonomous
-follow-up chat until the manager chooses one of those actions. Requesting changes keeps the premise
-in review and prompts for bounded feedback before another revision is created.
+Creative Director message with the exact submitted document attached. Review and change requests
+live in the document workspace; the attachment's More menu may approve that same exact revision as
+a convenience shortcut, but the agent does not create a duplicate multiple-choice card. The agent
+remains in `HighLevelReview` and emits no autonomous follow-up chat until the document revision is
+decided. The resulting exact-revision event wakes the agent, which verifies the artifact and revision
+before advancing. Requesting changes keeps the premise in review and captures bounded feedback
+before another revision is created. While pitch creation
+or revision is running, the active turn immediately shows a short conversational acknowledgement;
+the final review response replaces that provisional text instead of adding another permanent message.
 Collaborative mode supports iterative refinement until the manager locks an exact revision. The
 authoritative operating state stores the involvement mode, platform/genre constraints, story and
 approval preferences, reference guidance, supporting message IDs, and update time.

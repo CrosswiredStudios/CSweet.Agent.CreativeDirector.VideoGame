@@ -115,6 +115,8 @@ public sealed record CreativeDirectorOperatingState
     public Guid? HighLevelArtifactId { get; init; }
     public Guid? HighLevelLatestRevisionId { get; init; }
     public Guid? HighLevelAcceptedRevisionId { get; init; }
+    public Guid? HighLevelSourceTurnId { get; init; }
+    public Guid? HighLevelSourceMessageId { get; init; }
     public Guid? DetailedDesignPackageId { get; init; }
     public IReadOnlyList<ReferenceEvidence> References { get; init; } = [];
     public Guid? StaffingRequestId { get; init; }

@@ -177,24 +177,140 @@ public sealed class CreativeDirectorInteractionTests
     }
 
     [Fact]
-    public void PitchReviewIsOneConciseMessageWithTwoBoundedDecisions()
+    public void PitchReviewUsesTheDocumentAsItsSingleDecisionSurface()
     {
-        var conversationId = Guid.NewGuid();
-        var turnId = Guid.NewGuid();
-        var request = VideoGameCreativeDirectorAgent.BuildPitchReviewRequest(
-            conversationId, turnId, 1, "pitch-digest");
-
-        Assert.Equal(conversationId, request.ConversationId);
-        Assert.Equal(turnId, request.ChatTurnId);
-        Assert.Equal("Review the first game pitch draft.", request.Prompt);
-        Assert.Collection(
-            request.Options,
-            option => Assert.Equal(("accept", "Accept"), (option.Id, option.Label)),
-            option => Assert.Equal(("revise", "Request changes"), (option.Id, option.Label)));
-        Assert.Equal("accept", request.RecommendedOptionId);
         var message = VideoGameCreativeDirectorAgent.BuildPitchReviewMessage(1);
-        Assert.Contains("Open the attached document", message);
+        Assert.Contains("Open the attached document to review it", message);
+        Assert.Contains("More menu for quick approval", message);
         Assert.Contains("wait for your decision", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("below", message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task PitchWorkAcknowledgementImmediatelySetsHumanExpectations()
+    {
+        var runtime = new AgentTestRuntime();
+        await using var stream = runtime.CreateContext().CreateTurnStream(
+            Guid.NewGuid().ToString("D"), Guid.NewGuid());
+
+        await VideoGameCreativeDirectorAgent.PublishPitchWorkAcknowledgementAsync(
+            stream, 1, CancellationToken.None);
+
+        Assert.Equal(
+            "Perfect—I can work with that. I’m going to start creating the first draft of the game pitch now.",
+            VideoGameCreativeDirectorAgent.BuildPitchWorkAcknowledgement(1));
+        Assert.Contains(
+            "start revising the game pitch now",
+            VideoGameCreativeDirectorAgent.BuildPitchWorkAcknowledgement(2),
+            StringComparison.OrdinalIgnoreCase);
+        var progress = Assert.Single(runtime.Progress);
+        Assert.Equal(AgentTurnStreamKinds.DraftDelta, progress.GetProperty("kind").GetString());
+        Assert.Contains("start creating the first draft", progress.GetProperty("delta").GetString());
+    }
+
+    [Fact]
+    public async Task DocumentApprovalEventLocksTheExactPitchAndContinuesTheAgenda()
+    {
+        var organizationId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var conversationId = Guid.NewGuid();
+        var artifactId = Guid.NewGuid();
+        var revisionId = Guid.NewGuid();
+        var staffingRequestId = Guid.NewGuid();
+        var sourceTurnId = Guid.NewGuid();
+        var sourceMessageId = Guid.NewGuid();
+        const string hash = "exact-revision-hash";
+        var stateKey = VideoGameCreativeDirectorAgent.ProjectStateKey(null, conversationId);
+        var state = new CreativeDirectorOperatingState
+        {
+            IntakeConversationId = conversationId,
+            Phase = CreativeDirectorPhase.HighLevelReview,
+            HighLevelArtifactId = artifactId,
+            HighLevelLatestRevisionId = revisionId,
+            HighLevelSourceTurnId = sourceTurnId,
+            HighLevelSourceMessageId = sourceMessageId,
+            StaffingRequestId = staffingRequestId,
+            Proposals = [new GamePitchRevision(1, "# Pitch", "pitch-digest", DateTimeOffset.UtcNow, [], [])]
+        };
+        var portfolio = new CreativeDirectorPortfolioIndex
+        {
+            Projects = [new CreativeDirectorPortfolioEntry(
+                stateKey, null, conversationId, null, null, "Pitch",
+                CreativeDirectorPhase.HighLevelReview, DateTimeOffset.UtcNow)]
+        };
+        var stored = new Dictionary<string, AgentOperatingStateResponse>(StringComparer.Ordinal)
+        {
+            [stateKey] = OperatingState(stateKey, state),
+            [VideoGameCreativeDirectorAgent.PortfolioStateKey] = OperatingState(
+                VideoGameCreativeDirectorAgent.PortfolioStateKey, portfolio)
+        };
+        var confirmations = new List<string>();
+        var runtime = new AgentTestRuntime()
+            .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(
+                PlatformCapabilities.AgentOperatingStateRead,
+                (request, _) => Task.FromResult(new AgentOperatingStateReadResponse(
+                    stored.GetValueOrDefault(request.StateKey))))
+            .RegisterCapability<AgentOperatingStateWriteRequest, AgentOperatingStateResponse>(
+                PlatformCapabilities.AgentOperatingStateWrite,
+                (request, _) =>
+                {
+                    var saved = new AgentOperatingStateResponse(
+                        Guid.NewGuid(), request.StateKey, request.SchemaId, request.SchemaVersion,
+                        request.Status, request.SourceRevisions, request.ConditionCodes,
+                        request.DecisionFingerprint, request.OpenCommitmentCorrelations,
+                        request.AttentionReviewId, request.Payload,
+                        stored.GetValueOrDefault(request.StateKey)?.Revision + 1 ?? 1,
+                        DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+                    stored[request.StateKey] = saved;
+                    return Task.FromResult(saved);
+                })
+            .RegisterCapability<JsonElement, ArtifactDocument>(
+                PlatformCapabilities.ArtifactRead,
+                (_, _) => Task.FromResult(new ArtifactDocument(
+                    artifactId, "Game pitch", "video-game.game-vision.v1", "Approved",
+                    revisionId, null, revisionId, conversationId, null,
+                    [new ArtifactRevision(revisionId, 1, null, "# Pitch", hash, "Accepted",
+                        DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)])))
+            .RegisterCapability<JsonElement, CommunicationMessage>(
+                CommunicationCapabilities.MessageSend,
+                (request, _) =>
+                {
+                    confirmations.Add(request.GetProperty("content").GetString()!);
+                    return Task.FromResult(new CommunicationMessage(
+                        Guid.NewGuid(), 1, conversationId, employeeId, "Creative Director", "Agent",
+                        confirmations[^1], DateTimeOffset.UtcNow));
+                })
+            .RegisterCapability<ResourceChangeReadRequest, ResourceChangeReadResponse>(
+                PlatformCapabilities.ResourceChangeRead,
+                (_, _) => Task.FromResult(new ResourceChangeReadResponse([])));
+        var context = runtime.CreateContext(
+            organizationId.ToString("D"), Guid.NewGuid().ToString("D"),
+            new AgentIdentity(employeeId.ToString("D"), "Creative Director", null,
+                "Creative Director", null, [], null, managerId.ToString("D"), "CEO"));
+        var eventId = Guid.NewGuid();
+        var resourceEvent = new GenericResourceEvent(
+            Guid.NewGuid(), DateTimeOffset.UtcNow,
+            new AgentWorkContext(organizationId, Guid.Empty, null, null, null, null, null,
+                eventId, null, null),
+            "ArtifactRevision", revisionId, 1, "video-game.game-vision.v1", "accepted",
+            JsonSerializer.SerializeToElement(new { artifactId, originConversationId = conversationId }));
+
+        await new VideoGameCreativeDirectorAgent().HandleEventAsync(
+            new AgentEventEnvelope(Guid.NewGuid(), eventId,
+                WorkstreamEventNames.ArtifactRevisionDecidedV1,
+                JsonSerializer.SerializeToElement(resourceEvent), DateTimeOffset.UtcNow),
+            context, CancellationToken.None);
+
+        var savedState = stored[stateKey].Payload.Deserialize<CreativeDirectorOperatingState>(
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.NotNull(savedState?.AcceptedVision);
+        Assert.Equal(CreativeDirectorPhase.HighLevelAccepted, savedState!.Phase);
+        Assert.Equal(revisionId, savedState.AcceptedVision!.ArtifactRevisionId);
+        Assert.Equal(hash, savedState.AcceptedVision.ArtifactRevisionHash);
+        Assert.Equal(sourceTurnId, savedState.AcceptedVision.ChatTurnId);
+        Assert.Equal(sourceMessageId, savedState.AcceptedVision.MessageId);
+        Assert.Contains(confirmations, message => message.Contains("vision is locked", StringComparison.OrdinalIgnoreCase));
     }
 
     private static AgentOperatingStateResponse OperatingState<T>(string key, T payload) =>
