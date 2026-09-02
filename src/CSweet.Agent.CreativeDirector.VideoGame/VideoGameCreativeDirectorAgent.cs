@@ -28,7 +28,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.1.2";
+    public override string Version => "1.2.0";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -207,11 +207,107 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         await ReconcileDetailedPackageAsync(context, cancellationToken, resourceEvent.Context.WorkstreamId);
     }
 
-    public override Task HandleAttentionReviewAsync(
+    public override async Task HandleAttentionReviewAsync(
         AgentAttentionReviewContext review,
         AgentRuntimeContext context,
-        CancellationToken cancellationToken) =>
-        ReconcilePortfolioAsync(review.ReviewId, context, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        await ReconcilePortfolioAsync(review.ReviewId, context, cancellationToken);
+        await EnsurePortfolioAgendaAsync(context, cancellationToken);
+    }
+
+    public override async Task<PersonalTodoResult> HandlePersonalTodoAsync(
+        PersonalTodoItem item,
+        AgentRuntimeContext context,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (CreativeDirectorAgenda.IsVision(item))
+        {
+            var current = await ReadStateForConversationAsync(
+                item.SourceConversationId, context, cancellationToken);
+            if (current.State.AcceptedVision is { } accepted)
+                return PersonalTodoResult.Completed(
+                    $"Accepted high-level GDD revision {accepted.ArtifactRevisionId:D} ({accepted.ArtifactRevisionHash}).");
+
+            var waitingOn = Guid.TryParse(context.Identity?.ManagerEmployeeId, out var managerId)
+                ? managerId
+                : (Guid?)null;
+            var reason = current.State.HighLevelArtifactId.HasValue
+                ? "Waiting for the authoritative manager to decide the exact high-level GDD revision."
+                : current.State.DiscoveryInputs.Count == 0
+                    ? "Waiting for initial game direction or authorization to originate concepts."
+                    : "The game direction is durable; waiting for the next chat turn to produce or retry the high-level GDD.";
+            return PersonalTodoResult.WaitingUntil(
+                DateTimeOffset.UtcNow.AddHours(4), reason, waitingOn);
+        }
+
+        if (CreativeDirectorAgenda.IsProjectReview(item))
+        {
+            if (!item.SourceConversationId.HasValue)
+                return PersonalTodoResult.Blocked("A portfolio review requires its source project conversation.");
+
+            var current = await ReadStateForConversationAsync(
+                item.SourceConversationId, context, cancellationToken);
+            await ReconcileAsync(item.Id, context, cancellationToken, current.State, current.Revision);
+            current = await ReadStateForConversationAsync(
+                item.SourceConversationId, context, cancellationToken);
+
+            var cadence = CreativeDirectorAgenda.ProjectReviewCadence(current.State.Phase);
+            var reason = current.State.Phase == CreativeDirectorPhase.Oversight
+                ? "Project remains under creative oversight, including launch and post-production work. Waiting for the next periodic review; project events and chat requests may wake work sooner."
+                : "Project reconciliation completed. Waiting briefly for decisions, artifacts, staffing, or other project events before the next deterministic review.";
+            return PersonalTodoResult.WaitingUntil(DateTimeOffset.UtcNow.Add(cadence), reason);
+        }
+
+        if (!CreativeDirectorAgenda.IsChatAction(item))
+            return PersonalTodoResult.Blocked(
+                $"Personal agenda correlation '{item.CorrelationId ?? "missing"}' is not supported by this Creative Director version.");
+
+        if (!item.SourceConversationId.HasValue)
+            return PersonalTodoResult.Blocked("A chat-created creative request requires its source conversation.");
+
+        var request = CreativeDirectorAgenda.RequestText(item);
+        if (string.IsNullOrWhiteSpace(request))
+            return PersonalTodoResult.Blocked("The creative request does not contain a bounded requested action.");
+
+        var state = (await ReadStateForConversationAsync(
+            item.SourceConversationId, context, cancellationToken)).State;
+        try
+        {
+            var markdown = await GenerateAgendaDeliverableAsync(
+                request, state, item.Id, context, cancellationToken);
+            var document = await context.Platform.Artifacts.CreateAsync(new CreateArtifactDocument(
+                item.Title, markdown, CreativeDirectorAgenda.CreativeRequestArtifactType,
+                $"creative-agenda-document:{item.Id:N}",
+                OriginConversationId: item.SourceConversationId), cancellationToken);
+            var exact = document.Revisions.Single(x => x.Id == document.LatestRevisionId);
+            document = await context.Platform.Artifacts.SubmitAsync(new SubmitArtifactRevision(
+                document.Id, exact.Id, $"creative-agenda-submit:{item.Id:N}:{exact.Id:N}",
+                item.SourceConversationId,
+                Guid.TryParse(context.Identity?.ManagerEmployeeId, out var reviewerId) ? reviewerId : null),
+                cancellationToken);
+            await context.Platform.Communication.SendMessageAsync(
+                item.SourceConversationId.Value,
+                $"I completed `{item.Title}` as exact document revision `{exact.Id:D}` ({exact.ContentSha256}). " +
+                $"[Open the creative response](/organizations/{context.BusinessId}/documents?artifact={document.Id:D})",
+                $"creative-agenda-result:{item.Id:N}:{exact.Id:N}",
+                cancellationToken);
+            return PersonalTodoResult.Completed(
+                $"Submitted creative response document {document.Id:D}, revision {exact.Id:D}, SHA-256 {exact.ContentSha256}.");
+        }
+        catch (Exception exception) when (IsRecoverableAgendaFailure(exception, cancellationToken))
+        {
+            return PersonalTodoResult.WaitingUntil(
+                DateTimeOffset.UtcNow.AddMinutes(15),
+                $"Creative request retry is waiting because a configured model or document dependency was temporarily unavailable: {exception.Message}");
+        }
+        catch (PlatformCapabilityException exception)
+        {
+            return PersonalTodoResult.Blocked(
+                $"Creative request cannot complete with the current platform authority: {exception.Message}");
+        }
+    }
 
     public override async Task<AgentCoordinationTurnResult> HandleCoordinationTurnAsync(
         AgentCoordinationTurnRequest request,
@@ -374,6 +470,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             state = state with { IntakeConversationId = conversationId };
         var currentMessage = ExtractCurrentMessage(incoming.Message);
         var isManager = IsAuthoritativeManager(incoming, context.Identity);
+        var inboundDisposition = CreativeDirectorInteractionPolicy.Classify(currentMessage);
 
         if (!isManager && state.Phase != CreativeDirectorPhase.Oversight)
         {
@@ -382,6 +479,71 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 cancellationToken);
             return;
         }
+
+        var exactProjectContext = state.WorkstreamId.HasValue &&
+                                  incoming.WorkContext?.WorkstreamId == state.WorkstreamId;
+        if (!isManager && !exactProjectContext)
+        {
+            await stream.CommitAsync(
+                "I can answer or accept work from another agent only through an authenticated project context or durable coordination session. No personal task was created.",
+                cancellationToken);
+            return;
+        }
+
+        if (inboundDisposition == CreativeDirectorInboundDisposition.Acknowledge)
+        {
+            await stream.CommitAsync(
+                "Acknowledged. This message did not create or change a Creative Director task.",
+                cancellationToken);
+            return;
+        }
+
+        if (inboundDisposition == CreativeDirectorInboundDisposition.StatusRequest)
+        {
+            await stream.CommitAsync(CreateChatStatus(state), cancellationToken);
+            return;
+        }
+
+        if (inboundDisposition == CreativeDirectorInboundDisposition.InformationQuestion)
+        {
+            if (!IsCreativeQuestion(currentMessage))
+            {
+                await stream.CommitAsync(
+                    "That question is outside Creative Direction. Use a work-scoped coordination session with the accountable Producer or specialist; no personal task was created.",
+                    cancellationToken);
+                return;
+            }
+            var answer = await GenerateCreativeAnswerAsync(
+                currentMessage, state, incoming.MessageId, context, cancellationToken);
+            await stream.CommitAsync($"{answer}\n\nNo personal task was created; I completed this bounded answer in the current turn.",
+                cancellationToken);
+            return;
+        }
+
+        if (state.Phase == CreativeDirectorPhase.Oversight &&
+            inboundDisposition == CreativeDirectorInboundDisposition.DurableAction)
+        {
+            if (!IsCreativeQuestion(currentMessage))
+            {
+                await stream.CommitAsync(
+                    "That requested action belongs to another accountable role. Use work-scoped coordination or the project board; no Creative Director task was created.",
+                    cancellationToken);
+                return;
+            }
+            var todo = await AddChatActionTodoAsync(
+                incoming, conversationId, currentMessage, context, cancellationToken);
+            await stream.CommitAsync(
+                $"I created one durable Creative Director task `{todo.Id:D}` for this request. " +
+                "It is Ready on my personal board and will produce a revisioned creative response document.",
+                cancellationToken);
+            return;
+        }
+
+        if (isManager && state.Phase != CreativeDirectorPhase.Oversight &&
+            state.VisionTodoId.HasValue &&
+            inboundDisposition is CreativeDirectorInboundDisposition.WorkflowInput or
+                CreativeDirectorInboundDisposition.DurableAction)
+            await TryRequeuePersonalTodoAsync(state.VisionTodoId.Value, context, cancellationToken);
 
         var pendingEscalations = state.PendingEscalations.Where(x => !x.Relayed).ToList();
         var legacyEscalations = pendingEscalations.Where(x => !x.DecisionId.HasValue).ToList();
@@ -505,6 +667,8 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             };
             var saved = await SaveStateAsync(state, current.Revision, Guid.NewGuid(),
                 $"vision-accepted:{latest.Digest}", context, cancellationToken);
+            if (saved.State.VisionTodoId.HasValue)
+                await TryRequeuePersonalTodoAsync(saved.State.VisionTodoId.Value, context, cancellationToken);
             await stream.CommitAsync(
                 $"Vision revision {latest.Revision} (`{latest.Digest}`) is accepted. I’ll now submit the dedicated 14-role game-studio staffing plan and wait for governed approval and fulfillment.",
                 cancellationToken);
@@ -564,27 +728,42 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                     "Build the high-level game design document",
                     "Create, review, and accept the authoritative high-level GDD before product development.",
                     "High", null, $"high-level-gdd:{conversationId:N}",
-                    SourceConversationId: conversationId, SourceMessageId: incoming.MessageId), cancellationToken);
+                    SourceConversationId: conversationId, SourceMessageId: incoming.MessageId,
+                    CorrelationId: CreativeDirectorAgenda.VisionCorrelation(conversationId)), cancellationToken);
                 todoId = todo.Id;
             }
             ArtifactDocument document;
-            if (!state.HighLevelArtifactId.HasValue)
+            try
             {
-                document = await context.Platform.Artifacts.CreateAsync(new CreateArtifactDocument(
-                    "High-Level Game Design Document", formal, VideoGameArtifactTypeKeys.Vision,
-                    $"high-level-gdd-create:{conversationId:N}", OriginConversationId: conversationId), cancellationToken);
+                if (!state.HighLevelArtifactId.HasValue)
+                {
+                    document = await context.Platform.Artifacts.CreateAsync(new CreateArtifactDocument(
+                        "High-Level Game Design Document", formal, VideoGameArtifactTypeKeys.Vision,
+                        $"high-level-gdd-create:{conversationId:N}", OriginConversationId: conversationId), cancellationToken);
+                }
+                else
+                {
+                    _ = await context.Platform.Artifacts.ReviseAsync(new CreateArtifactRevision(
+                        state.HighLevelArtifactId.Value, state.HighLevelLatestRevisionId!.Value, formal,
+                        $"high-level-gdd-revision:{digest}"), cancellationToken);
+                    document = await context.Platform.Artifacts.GetAsync(state.HighLevelArtifactId.Value, cancellationToken);
+                }
+                var pendingRevision = document.Revisions.MaxBy(x => x.Number)!;
+                document = await context.Platform.Artifacts.SubmitAsync(new SubmitArtifactRevision(
+                    document.Id, pendingRevision.Id, $"high-level-gdd-submit:{pendingRevision.Id:N}",
+                    conversationId, Guid.TryParse(context.Identity?.EmployeeId, out var submittingReviewerEmployeeId)
+                        ? submittingReviewerEmployeeId
+                        : null), cancellationToken);
             }
-            else
+            catch (PlatformCapabilityException exception) when (
+                exception.Capability.StartsWith("platform.artifact.", StringComparison.Ordinal))
             {
-                var draft = await context.Platform.Artifacts.ReviseAsync(new CreateArtifactRevision(
-                    state.HighLevelArtifactId.Value, state.HighLevelLatestRevisionId!.Value, formal,
-                    $"high-level-gdd-revision:{digest}"), cancellationToken);
-                document = await context.Platform.Artifacts.GetAsync(state.HighLevelArtifactId.Value, cancellationToken);
+                await stream.CommitAsync(
+                    $"{formal}\n\nI generated the pitch, but could not persist its high-level GDD because the Creative Director's document grant is unavailable. The direction remains saved; approve the organization-level document-create grant and retry. ({exception.Message})",
+                    cancellationToken);
+                return;
             }
             var latestArtifactRevision = document.Revisions.MaxBy(x => x.Number)!;
-            document = await context.Platform.Artifacts.SubmitAsync(new SubmitArtifactRevision(
-                document.Id, latestArtifactRevision.Id, $"high-level-gdd-submit:{latestArtifactRevision.Id:N}",
-                conversationId, Guid.TryParse(context.Identity?.EmployeeId, out var reviewerEmployeeId) ? reviewerEmployeeId : null), cancellationToken);
             var artifactAccepted = false;
             if (delegated)
             {
@@ -644,7 +823,11 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 $"pitch-revision:{digest}", context, cancellationToken);
             await stream.CommitAsync($"{formal}\n\n[Open the live high-level GDD](/organizations/{context.BusinessId}/documents?artifact={document.Id:D})", cancellationToken);
             if (artifactAccepted)
+            {
+                if (saved.State.VisionTodoId.HasValue)
+                    await TryRequeuePersonalTodoAsync(saved.State.VisionTodoId.Value, context, cancellationToken);
                 await ReconcileAsync(Guid.NewGuid(), context, cancellationToken, saved.State, saved.Revision);
+            }
             return;
         }
 
@@ -671,7 +854,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             incoming.UserId, state, context, cancellationToken);
         var contents = new List<AIContent>
         {
-            new TextContent($"Manager direction:\n{currentMessage}\n\nDiscovery context:\n{string.Join("\n", state.DiscoveryInputs)}\n\nManager involvement and preferences:\n{JsonSerializer.Serialize(state.ManagerPreferences)}\n\nAuthoritative business, finance, organization, and approved-memory grounding:\n{grounding}\n\nPrior accepted constraints:\n{string.Join("\n", state.Proposals.SelectMany(x => x.PositiveConstraints).Distinct())}")
+            new TextContent($"/no_think\nManager direction:\n{currentMessage}\n\nDiscovery context:\n{string.Join("\n", state.DiscoveryInputs)}\n\nManager involvement and preferences:\n{JsonSerializer.Serialize(state.ManagerPreferences)}\n\nAuthoritative business, finance, organization, and approved-memory grounding:\n{grounding}\n\nPrior accepted constraints:\n{string.Join("\n", state.Proposals.SelectMany(x => x.PositiveConstraints).Distinct())}")
         };
         contents.AddRange(SelectModelReferences(state.References, conversationId).Select(x => new AgentMediaReferenceContent(
             x.AttachmentId, x.MessageId, x.ConversationId, x.FileName, x.ContentType, x.SizeBytes, x.Sha256)));
@@ -685,10 +868,11 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         ], new ChatOptions
         {
             Temperature = 0.7f,
-            MaxOutputTokens = 1_024,
+            MaxOutputTokens = 2_048,
             Reasoning = new ReasoningOptions
             {
-                Effort = ReasoningEffort.Low
+                Effort = ReasoningEffort.Low,
+                Output = ReasoningOutput.None
             }
         }, cancellationToken);
         return string.IsNullOrWhiteSpace(response.Text)
@@ -917,6 +1101,95 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 $"Accepted vision:\n{state.AcceptedVision?.Markdown}\n\nQuestion:\n{question}\n\nCoordination session: {sessionId:D}")
         ], cancellationToken: cancellationToken);
         return response.Text ?? "No creative answer was produced.";
+    }
+
+    private async Task<string> GenerateAgendaDeliverableAsync(
+        string request,
+        CreativeDirectorOperatingState state,
+        Guid agendaItemId,
+        AgentRuntimeContext context,
+        CancellationToken cancellationToken)
+    {
+        var provider = Settings.GetGuid("llmProviderId")
+            ?? throw new InvalidOperationException("A configured model provider is required for creative agenda work.");
+        var client = context.CreateChatClient(new AgentLlmSelection(
+            provider, Settings.GetString("llmModel"),
+            new AgentLlmInvocationContext(InvocationKind: "creative-personal-agenda")));
+        var response = await client.GetResponseAsync([
+            new ChatMessage(ChatRole.System,
+                "You are the Video Game Creative Director completing one bounded, authorized personal agenda item. " +
+                "Produce an executive-readable Markdown response with: Outcome, Recommendation, Creative Rationale, " +
+                "Constraints Preserved, Risks, and Next Decision. Stay within creative direction. Do not claim to have " +
+                "inspected evidence that is not supplied, and identify missing exact evidence as a blocker."),
+            new ChatMessage(ChatRole.User,
+                $"Agenda item: {agendaItemId:D}\n\nRequested action:\n{request}\n\n" +
+                $"Accepted vision:\n{state.AcceptedVision?.Markdown ?? "No accepted vision yet."}\n\n" +
+                $"Discovery context:\n{string.Join("\n", state.DiscoveryInputs)}")
+        ], cancellationToken: cancellationToken);
+        if (string.IsNullOrWhiteSpace(response.Text))
+            throw new InvalidOperationException("The configured model returned an empty creative agenda deliverable.");
+        return response.Text.Trim();
+    }
+
+    private static string CreateChatStatus(CreativeDirectorOperatingState state) =>
+        $"Creative Direction status: **{state.Phase}** for **{state.WorkingTitle ?? "the current game"}**. " +
+        $"Accepted vision: **{(state.AcceptedVision is null ? "pending" : "yes")}**; " +
+        $"project board: **{(state.BoardId.HasValue ? "active" : "pending")}**; " +
+        $"staffed specialists: **{state.SpecialistEmployeeIds.Count}/14**; " +
+        $"unresolved creative escalations: **{state.PendingEscalations.Count(x => !x.Relayed)}**. " +
+        "I answered from durable state and did not create a new personal task.";
+
+    private static async Task<PersonalTodoItem> AddChatActionTodoAsync(
+        CommunicationMessageReceivedEvent incoming,
+        Guid conversationId,
+        string request,
+        AgentRuntimeContext context,
+        CancellationToken cancellationToken)
+    {
+        var urgent = request.Contains("urgent", StringComparison.OrdinalIgnoreCase) ||
+                     request.Contains("block", StringComparison.OrdinalIgnoreCase) ||
+                     request.Contains("launch", StringComparison.OrdinalIgnoreCase);
+        return await context.Platform.PersonalTodo.AddAsync(new AddPersonalTodoItemRequest(
+            CreativeDirectorAgenda.TaskTitle(request),
+            $"Source message: {incoming.MessageId:D}\nRequested action:\n{request}",
+            urgent ? WorkPriorities.High : WorkPriorities.Medium,
+            null,
+            $"creative-chat-action:{incoming.MessageId:N}",
+            SourceConversationId: conversationId,
+            SourceMessageId: incoming.MessageId,
+            CorrelationId: CreativeDirectorAgenda.ChatActionCorrelation(incoming.MessageId),
+            CausationId: incoming.MessageId.ToString("D")), cancellationToken);
+    }
+
+    private static async Task TryRequeuePersonalTodoAsync(
+        Guid todoId,
+        AgentRuntimeContext context,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var directory = await context.Platform.PersonalTodo.ListAsync(cancellationToken);
+            var item = directory.Boards.SelectMany(x => x.Items).SingleOrDefault(x => x.Id == todoId);
+            if (item is null ||
+                item.Status != PersonalTodoStatuses.Blocked &&
+                !(item.Status == PersonalTodoStatuses.Running && item.Wait is not null))
+                return;
+            _ = await context.Platform.PersonalTodo.RequeueAsync(new RequeuePersonalTodoItemRequest(
+                item.Id, item.Revision, $"creative-agenda-requeue:{item.Id:N}:{item.Revision}"), cancellationToken);
+        }
+        catch (PlatformCapabilityException exception) when (
+            exception.Code is PlatformCapabilityErrorCode.Conflict or PlatformCapabilityErrorCode.ValidationFailed)
+        {
+            // Another wake or event already moved the card. The next queue reconciliation is authoritative.
+        }
+    }
+
+    private static bool IsRecoverableAgendaFailure(Exception exception, CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested) return false;
+        return exception is HttpRequestException or TimeoutException or OperationCanceledException or InvalidOperationException ||
+               exception is PlatformCapabilityException platform &&
+               platform.Capability == PlatformCapabilities.LlmChatStream;
     }
 
     private async Task ReconcileAsync(
@@ -1972,6 +2245,26 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         }
     }
 
+    private static async Task EnsurePortfolioAgendaAsync(
+        AgentRuntimeContext context,
+        CancellationToken cancellationToken)
+    {
+        var index = await ReadPortfolioIndexAsync(context, cancellationToken);
+        foreach (var entry in index.Projects.OrderBy(x => x.UpdatedAt))
+        {
+            _ = await context.Platform.PersonalTodo.AddAsync(new AddPersonalTodoItemRequest(
+                $"Review creative direction: {entry.WorkingTitle}",
+                $"Reconcile the durable creative state for project conversation {entry.ConversationId:D}, " +
+                "advance any work that is currently actionable, and remain responsible through launch, live operations, updates, expansions, DLC, or sequel recommendation.",
+                entry.Phase == CreativeDirectorPhase.Oversight ? WorkPriorities.Medium : WorkPriorities.High,
+                null,
+                $"creative-project-review:{entry.ConversationId:N}",
+                SourceConversationId: entry.ConversationId,
+                CorrelationId: CreativeDirectorAgenda.ProjectReviewCorrelation(entry.ConversationId)),
+                cancellationToken);
+        }
+    }
+
     internal static string ProjectStateKey(Guid? workstreamId, Guid? conversationId) =>
         workstreamId.HasValue
             ? $"{StateKey}:workstream:{workstreamId.Value:N}"
@@ -2014,6 +2307,20 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         if (index.Projects.Count == 1)
             return await ReadStateByKeyAsync(index.Projects[0].StateKey, context, cancellationToken);
         return await ReadStateByKeyAsync(StateKey, context, cancellationToken);
+    }
+
+    private async Task<(CreativeDirectorOperatingState State, long? Revision)> ReadStateForConversationAsync(
+        Guid? conversationId,
+        AgentRuntimeContext context,
+        CancellationToken cancellationToken)
+    {
+        if (!conversationId.HasValue)
+            return await ReadStateAsync(context, cancellationToken);
+        var index = await ReadPortfolioIndexAsync(context, cancellationToken);
+        var entry = index.Projects.FirstOrDefault(x => x.ConversationId == conversationId.Value);
+        return entry is null
+            ? await ReadStateByKeyAsync(ProjectStateKey(null, conversationId), context, cancellationToken)
+            : await ReadStateByKeyAsync(entry.StateKey, context, cancellationToken);
     }
 
     private static async Task<(CreativeDirectorOperatingState State, long? Revision)> ReadStateByKeyAsync(
@@ -2318,6 +2625,10 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             return false;
 
         return exception is HttpRequestException or TimeoutException or OperationCanceledException ||
+               exception is InvalidOperationException
+               {
+                   Message: "The configured model returned an empty game pitch."
+               } ||
                exception is PlatformCapabilityException platformException &&
                platformException.Capability == PlatformCapabilities.LlmChatStream;
     }

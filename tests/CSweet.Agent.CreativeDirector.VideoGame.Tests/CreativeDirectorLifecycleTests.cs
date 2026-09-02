@@ -202,6 +202,9 @@ public sealed class CreativeDirectorLifecycleTests
         Assert.True(VideoGameCreativeDirectorAgent.IsRecoverablePitchGenerationFailure(
             new OperationCanceledException("request timeout"), CancellationToken.None));
         Assert.True(VideoGameCreativeDirectorAgent.IsRecoverablePitchGenerationFailure(
+            new InvalidOperationException("The configured model returned an empty game pitch."),
+            CancellationToken.None));
+        Assert.True(VideoGameCreativeDirectorAgent.IsRecoverablePitchGenerationFailure(
             new PlatformCapabilityException(
                 PlatformCapabilities.LlmChatStream,
                 PlatformCapabilityErrorCode.Unavailable,

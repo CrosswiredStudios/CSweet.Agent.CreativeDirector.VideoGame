@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.1.2`
+- Version: `1.2.0`
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`
@@ -50,6 +50,18 @@ and enters oversight only after an exact-digest, blocker-free
 During oversight it answers creative questions, escalates decisions owned by other roles, relays the
 manager's answer to the original worker, consumes subordinate status reports, and emits attributed
 management reporting without unchanged-state chatter.
+
+Inbound chat is classified before lifecycle-specific work. Status and bounded information questions
+are answered without creating phantom work; acknowledgements remain task-free; authenticated
+project-scoped creative action requests create one correlated personal agenda card. The SDK claims
+Ready cards, and the agent completes, defers, or blocks each bounded unit explicitly. Human
+multiple-choice answers return as durable chat turns, while agent-to-agent work uses direct messages
+for simple exchanges and typed coordination for multi-turn or evidence-bound collaboration.
+Attention review also ensures one stable portfolio-review card per indexed game. Active development
+is revisited on a four-hour safety-net cadence and ongoing oversight daily; project events and chat
+can wake bounded work sooner. Oversight explicitly includes launch, stabilization, live operations,
+updates, expansions, DLC, and sequel recommendation. A sequel that is approved becomes a separate
+project rather than being folded into the predecessor's state.
 
 ## Develop
 

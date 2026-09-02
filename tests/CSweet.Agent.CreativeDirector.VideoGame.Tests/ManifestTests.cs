@@ -31,6 +31,15 @@ public sealed class ManifestTests
         Assert.Contains(manifest.Requires, x => x.Name == MemoryCapabilities.BusinessPropose);
         Assert.Contains(manifest.Requires, x => x.Name == AgentLifecycleCapabilities.CompleteOnboarding);
         Assert.Contains(AgentLifecycleEvents.Onboarded, manifest.Events.Subscribes);
+        Assert.Contains(PersonalTodoEvents.Available, manifest.Events.Subscribes);
+        Assert.Contains(manifest.Requires, x => x.Name == PersonalTodoCapabilities.Read);
+        Assert.Contains(manifest.Requires, x => x.Name == PersonalTodoCapabilities.Add);
+        Assert.Contains(manifest.Requires, x => x.Name == PersonalTodoCapabilities.Requeue);
+        Assert.Contains(manifest.Requires, x => x.Name == PersonalTodoCapabilities.Claim);
+        Assert.Contains(manifest.Requires, x => x.Name == PersonalTodoCapabilities.Complete);
+        Assert.Contains(manifest.Requires, x => x.Name == PersonalTodoCapabilities.Block);
+        Assert.Contains(manifest.Requires, x => x.Name == PersonalTodoCapabilities.Release);
+        Assert.Contains(manifest.Requires, x => x.Name == PersonalTodoCapabilities.Defer);
         Assert.Contains(WorkstreamEventNames.ArtifactPackageSubmittedV1, manifest.Events.Subscribes);
         Assert.Contains(WorkstreamEventNames.ArtifactPackageDecidedV1, manifest.Events.Subscribes);
         var profile = Assert.Single(manifest.WorkstreamProfiles.Provides);
