@@ -1,11 +1,42 @@
 using System.Text.Json;
 using CSweet.Agent.SDK;
 using CSweet.WorkManagement.Contracts;
+using Microsoft.Extensions.AI;
 
 namespace CSweet.Agent.CreativeDirector.VideoGame.Tests;
 
 public sealed class CreativeDirectorInteractionTests
 {
+    [Fact]
+    public async Task ModelStreamingPublishesReasoningAndDraftToTheConversationTurn()
+    {
+        var runtime = new AgentTestRuntime();
+        var turnId = Guid.NewGuid();
+        string response;
+
+        await using (var stream = runtime.CreateContext().CreateTurnStream(
+                         Guid.NewGuid().ToString("D"), turnId, 1))
+        {
+            response = await VideoGameCreativeDirectorAgent.StreamAssistantResponseAsync(
+                new ReasoningChatClient(),
+                [new ChatMessage(ChatRole.User, "Create a concise game direction.")],
+                new ChatOptions(),
+                stream,
+                CancellationToken.None);
+        }
+
+        Assert.Equal("A focused creative answer.", response);
+        var reasoning = Assert.Single(runtime.Progress,
+            progress => progress.GetProperty("kind").GetString() == AgentTurnStreamKinds.ReasoningDelta);
+        Assert.Equal("I should preserve the requested tone and scope.",
+            reasoning.GetProperty("delta").GetString());
+        Assert.Contains(runtime.Progress,
+            progress => progress.GetProperty("kind").GetString() == AgentTurnStreamKinds.ReasoningCompleted);
+        var draft = Assert.Single(runtime.Progress,
+            progress => progress.GetProperty("kind").GetString() == AgentTurnStreamKinds.DraftDelta);
+        Assert.Equal(response, draft.GetProperty("delta").GetString());
+    }
+
     [Theory]
     [InlineData("Thanks!", (int)CreativeDirectorInboundDisposition.Acknowledge)]
     [InlineData("What is the project status?", (int)CreativeDirectorInboundDisposition.StatusRequest)]
@@ -158,4 +189,33 @@ public sealed class CreativeDirectorInteractionTests
         {
             CorrelationId = correlationId
         };
+
+    private sealed class ReasoningChatClient : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return new ChatResponseUpdate(ChatRole.Assistant,
+                [new TextReasoningContent("I should preserve the requested tone and scope.")]);
+            yield return new ChatResponseUpdate(ChatRole.Assistant,
+                [new TextContent("A focused creative answer.")]);
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null) =>
+            serviceType.IsInstanceOfType(this) ? this : null;
+
+        public void Dispose()
+        {
+        }
+    }
 }

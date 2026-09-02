@@ -28,7 +28,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.2.0";
+    public override string Version => "1.2.1";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -369,7 +369,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         if (IsCreativeQuestion(question))
         {
             var answer = await GenerateCreativeAnswerAsync(question, current.State, request.SessionId,
-                context, cancellationToken);
+                null, context, cancellationToken);
             return AgentCoordinationTurnResult.Continue(answer);
         }
 
@@ -514,7 +514,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 return;
             }
             var answer = await GenerateCreativeAnswerAsync(
-                currentMessage, state, incoming.MessageId, context, cancellationToken);
+                currentMessage, state, incoming.MessageId, stream, context, cancellationToken);
             await stream.CommitAsync($"{answer}\n\nNo personal task was created; I completed this bounded answer in the current turn.",
                 cancellationToken);
             return;
@@ -700,7 +700,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             try
             {
                 pitch = await GeneratePitchAsync(incoming, currentMessage, state,
-                    conversationId, context, cancellationToken);
+                    conversationId, stream, context, cancellationToken);
             }
             catch (Exception exception) when (
                 IsRecoverablePitchGenerationFailure(exception, cancellationToken))
@@ -847,6 +847,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         string currentMessage,
         CreativeDirectorOperatingState state,
         Guid conversationId,
+        AgentTurnStreamWriter stream,
         AgentRuntimeContext context,
         CancellationToken cancellationToken)
     {
@@ -854,7 +855,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             incoming.UserId, state, context, cancellationToken);
         var contents = new List<AIContent>
         {
-            new TextContent($"/no_think\nManager direction:\n{currentMessage}\n\nDiscovery context:\n{string.Join("\n", state.DiscoveryInputs)}\n\nManager involvement and preferences:\n{JsonSerializer.Serialize(state.ManagerPreferences)}\n\nAuthoritative business, finance, organization, and approved-memory grounding:\n{grounding}\n\nPrior accepted constraints:\n{string.Join("\n", state.Proposals.SelectMany(x => x.PositiveConstraints).Distinct())}")
+            new TextContent($"Manager direction:\n{currentMessage}\n\nDiscovery context:\n{string.Join("\n", state.DiscoveryInputs)}\n\nManager involvement and preferences:\n{JsonSerializer.Serialize(state.ManagerPreferences)}\n\nAuthoritative business, finance, organization, and approved-memory grounding:\n{grounding}\n\nPrior accepted constraints:\n{string.Join("\n", state.Proposals.SelectMany(x => x.PositiveConstraints).Distinct())}")
         };
         contents.AddRange(SelectModelReferences(state.References, conversationId).Select(x => new AgentMediaReferenceContent(
             x.AttachmentId, x.MessageId, x.ConversationId, x.FileName, x.ContentType, x.SizeBytes, x.Sha256)));
@@ -862,7 +863,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             incoming.ProviderProfileId,
             Settings.GetString("llmModel"),
             new AgentLlmInvocationContext(conversationId, incoming.TurnId, "creative-pitch")));
-        var response = await client.GetResponseAsync([
+        var response = await StreamAssistantResponseAsync(client, [
             new ChatMessage(ChatRole.System, SystemPrompt),
             new ChatMessage(ChatRole.User, contents)
         ], new ChatOptions
@@ -872,12 +873,12 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             Reasoning = new ReasoningOptions
             {
                 Effort = ReasoningEffort.Low,
-                Output = ReasoningOutput.None
+                Output = ReasoningOutput.Full
             }
-        }, cancellationToken);
-        return string.IsNullOrWhiteSpace(response.Text)
+        }, stream, cancellationToken);
+        return string.IsNullOrWhiteSpace(response)
             ? throw new InvalidOperationException("The configured model returned an empty game pitch.")
-            : response.Text;
+            : response;
     }
 
     private async Task<string> BuildCreativeGroundingAsync(
@@ -1087,6 +1088,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         string question,
         CreativeDirectorOperatingState state,
         Guid sessionId,
+        AgentTurnStreamWriter? stream,
         AgentRuntimeContext context,
         CancellationToken cancellationToken)
     {
@@ -1094,13 +1096,50 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         if (provider == Guid.Empty) return "The creative answer is blocked because no model provider is configured.";
         var client = context.CreateChatClient(new AgentLlmSelection(provider, Settings.GetString("llmModel"),
             new AgentLlmInvocationContext(InvocationKind: "creative-oversight")));
-        var response = await client.GetResponseAsync([
+        var response = await StreamAssistantResponseAsync(client, [
             new ChatMessage(ChatRole.System,
                 "Answer only within gameplay experience, creative intent, theme, tone, narrative, aesthetics, and accepted vision scope. Be decisive and concise. Do not ask a follow-up question in prose. If clarification is required, state the ambiguity declaratively so the runtime can route it through structured multiple choice."),
             new ChatMessage(ChatRole.User,
                 $"Accepted vision:\n{state.AcceptedVision?.Markdown}\n\nQuestion:\n{question}\n\nCoordination session: {sessionId:D}")
-        ], cancellationToken: cancellationToken);
-        return response.Text ?? "No creative answer was produced.";
+        ], new ChatOptions
+        {
+            Reasoning = new ReasoningOptions
+            {
+                Effort = ReasoningEffort.Low,
+                Output = ReasoningOutput.Full
+            }
+        }, stream, cancellationToken);
+        return string.IsNullOrWhiteSpace(response) ? "No creative answer was produced." : response;
+    }
+
+    internal static async Task<string> StreamAssistantResponseAsync(
+        IChatClient client,
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options,
+        AgentTurnStreamWriter? stream,
+        CancellationToken cancellationToken)
+    {
+        var response = new StringBuilder();
+        await foreach (var update in client.GetStreamingResponseAsync(messages, options, cancellationToken))
+        {
+            if (stream is not null)
+            {
+                foreach (var reasoning in update.Contents.OfType<TextReasoningContent>())
+                {
+                    if (!string.IsNullOrEmpty(reasoning.Text))
+                        await stream.WriteReasoningAsync(reasoning.Text, cancellationToken);
+                }
+            }
+
+            if (string.IsNullOrEmpty(update.Text)) continue;
+            response.Append(update.Text);
+            if (stream is not null)
+                await stream.WriteDraftAsync(update.Text, cancellationToken);
+        }
+
+        if (stream is not null)
+            await stream.CompleteReasoningAsync(cancellationToken);
+        return response.ToString();
     }
 
     private async Task<string> GenerateAgendaDeliverableAsync(
