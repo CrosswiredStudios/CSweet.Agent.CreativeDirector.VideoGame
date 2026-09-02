@@ -1,6 +1,6 @@
 # Deterministic Creative Director Operating Model
 
-**Status:** Version 1.2.4 implementation baseline and forward design
+**Status:** Version 1.2.5 implementation baseline and forward design
 **Scope:** `CSweet.Agent.CreativeDirector.VideoGame`  
 **Purpose:** Define an inspectable, partially deterministic operating model for a video game Creative Director agent from initial hire through concurrent project supervision, launch, live operations, expansions, sequels, and closure.
 
@@ -21,7 +21,7 @@ The goal is not deterministic creative output. The goal is deterministic intent,
 
 ## 2. Current-state assessment
 
-Version 1.2.4 establishes the current executable slice of this model. The agent now has:
+Version 1.2.5 establishes the current executable slice of this model. The agent now has:
 
 - An explicit Creative Director lifecycle.
 - Exact artifact revisions and hashes.
@@ -31,6 +31,8 @@ Version 1.2.4 establishes the current executable slice of this model. The agent 
 - A typed inbound-message classifier that distinguishes workflow input, acknowledgement, status,
   immediate information, and durable action.
 - One correlated personal card for each chat-created creative obligation.
+- One accepted-vision-correlated staffing card whose claimed execution owns the governed 14-role
+  proposal and persists its request ID before completion.
 - One stable recurring portfolio-review card per project, reconciled every four hours during active
   development and daily during oversight, including launch and post-production responsibility.
 - Personal-card claim, completion, deferral, blocking, release, and requeue support through the SDK.
@@ -129,7 +131,11 @@ Every selected action should be explainable with the following facts:
 3. Submit the exact revision for structured approval.
 4. Accept only the exact authorized revision and digest.
 5. Complete the vision agenda card.
-6. Begin governed staffing and workstream formation.
+6. Create one visible, project-correlated personal card for preparation and submission of the
+   governed staffing plan.
+7. Let the claimed staffing card submit the idempotent resource-change proposal and complete only
+   after its request identifier is durably stored.
+8. Continue governed staffing and workstream formation from platform decisions and events.
 
 ### 4.5 Team and project formation
 
@@ -379,6 +385,7 @@ A linked personal card should be created only when Creative Director judgment or
 | New project request | Perform project intake | Completed intake record and pursue/defer/reject decision |
 | Concept exploration authorized | Produce bounded alternatives | Revisioned exploration notebook and recommendation |
 | Vision revision submitted | Review or route exact revision | Structured decision against exact digest |
+| Vision revision accepted | Create and run the correlated staffing-plan card | Governed resource-change request ID durably stored |
 | Staffing or workstream approved | Verify project foundation and handoff | Board, accountable Producer, and exact-digest acknowledgement |
 | Milestone evidence submitted | Perform rubric-bound review | Findings and decision tied to exact evidence |
 | Blocking creative question | Preempt lower-priority exploration | Decision relayed to original requester |
@@ -694,7 +701,10 @@ When an agent-owned personal card becomes Ready, C-Sweet can emit a durable `com
 
 The per-installation claim gate, item revision, event identity, and claim expiration prevent concurrent or abandoned execution from silently completing the same card twice.
 
-The current Creative Director does not implement `HandlePersonalTodoAsync`. The SDK default blocks claimed work as unsupported. The current manifest also requests only `work.personal-todo.add.v1`; implementation of this specification will require review of the complete personal-task capability and event subscription envelope.
+The current Creative Director implements `HandlePersonalTodoAsync` for vision, staffing-plan,
+authenticated chat-action, and portfolio-review cards. Its manifest requests the complete personal
+task lifecycle and subscribes to availability events. Unknown correlation types are blocked with an
+actionable reason instead of being interpreted by the model.
 
 ### 15.3 Personal-task dispositions
 
@@ -1230,7 +1240,7 @@ Implementation tests should cover at least:
 
 The Creative Director should depend only on the typed SDK and granted platform capabilities. These platform sources are behavioral references for implementation and test design, not direct dependencies.
 
-## 17. Version 1.2.4 implementation boundary
+## 17. Version 1.2.5 implementation boundary
 
 The current implementation intentionally delivers a safe vertical slice rather than pretending the
 entire target operating model is complete.
@@ -1246,6 +1256,10 @@ Implemented now:
   the source conversation.
 - Vision work is correlated to its source project and remains visibly waiting until its exact
   accepted revision exists.
+- Exact vision acceptance creates one idempotent staffing-plan card before the agent confirms that
+  it is moving on. The approval callback does not submit staffing invisibly. The claimed card owns
+  the 14-role proposal, stores the governed request ID, and then completes; transient dependency
+  failure defers the visible card and missing authority blocks it with an actionable reason.
 - Pitch review uses the revisioned document as its only decision record. The document viewer and
   Communications quick-approve action both decide the exact submitted revision; no duplicate
   multiple-choice widget is created. Human document decisions emit a targeted typed event so the

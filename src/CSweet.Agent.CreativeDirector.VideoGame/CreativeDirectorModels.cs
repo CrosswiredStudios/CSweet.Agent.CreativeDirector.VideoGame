@@ -119,6 +119,7 @@ public sealed record CreativeDirectorOperatingState
     public Guid? HighLevelSourceMessageId { get; init; }
     public Guid? DetailedDesignPackageId { get; init; }
     public IReadOnlyList<ReferenceEvidence> References { get; init; } = [];
+    public Guid? StaffingTodoId { get; init; }
     public Guid? StaffingRequestId { get; init; }
     public Guid? ProducerEmployeeId { get; init; }
     public IReadOnlyDictionary<string, Guid> SpecialistEmployeeIds { get; init; } =

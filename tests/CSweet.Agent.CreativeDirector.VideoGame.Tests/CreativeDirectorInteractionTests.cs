@@ -57,6 +57,8 @@ public sealed class CreativeDirectorInteractionTests
 
         Assert.Equal(CreativeDirectorAgenda.VisionCorrelation(conversationId),
             CreativeDirectorAgenda.VisionCorrelation(conversationId));
+        Assert.Equal(CreativeDirectorAgenda.StaffingCorrelation(conversationId),
+            CreativeDirectorAgenda.StaffingCorrelation(conversationId));
         Assert.Equal(CreativeDirectorAgenda.ChatActionCorrelation(messageId),
             CreativeDirectorAgenda.ChatActionCorrelation(messageId));
         Assert.Equal(CreativeDirectorAgenda.ProjectReviewCorrelation(conversationId),
@@ -209,6 +211,101 @@ public sealed class CreativeDirectorInteractionTests
     }
 
     [Fact]
+    public async Task StaffingCardOwnsAndCompletesTheGovernedProposalSubmission()
+    {
+        var organizationId = Guid.NewGuid();
+        var installationId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var conversationId = Guid.NewGuid();
+        var sourceTurnId = Guid.NewGuid();
+        var sourceMessageId = Guid.NewGuid();
+        var artifactId = Guid.NewGuid();
+        var artifactRevisionId = Guid.NewGuid();
+        var staffingRequestId = Guid.NewGuid();
+        var stateKey = VideoGameCreativeDirectorAgent.ProjectStateKey(null, conversationId);
+        var state = new CreativeDirectorOperatingState
+        {
+            IntakeConversationId = conversationId,
+            Phase = CreativeDirectorPhase.HighLevelAccepted,
+            AcceptedVision = new AcceptedGameVision(
+                1, "pitch-digest", "# Accepted pitch", artifactId, artifactRevisionId,
+                "pitch-hash", conversationId, sourceTurnId, sourceMessageId, DateTimeOffset.UtcNow)
+        };
+        var portfolio = new CreativeDirectorPortfolioIndex
+        {
+            Projects = [new CreativeDirectorPortfolioEntry(
+                stateKey, null, conversationId, null, null, "Accepted pitch",
+                CreativeDirectorPhase.HighLevelAccepted, DateTimeOffset.UtcNow)]
+        };
+        var stored = new Dictionary<string, AgentOperatingStateResponse>(StringComparer.Ordinal)
+        {
+            [stateKey] = OperatingState(stateKey, state),
+            [VideoGameCreativeDirectorAgent.PortfolioStateKey] = OperatingState(
+                VideoGameCreativeDirectorAgent.PortfolioStateKey, portfolio)
+        };
+        ResourceChangeProposalRequest? proposal = null;
+        var runtime = new AgentTestRuntime()
+            .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(
+                PlatformCapabilities.AgentOperatingStateRead,
+                (request, _) => Task.FromResult(new AgentOperatingStateReadResponse(
+                    stored.GetValueOrDefault(request.StateKey))))
+            .RegisterCapability<AgentOperatingStateWriteRequest, AgentOperatingStateResponse>(
+                PlatformCapabilities.AgentOperatingStateWrite,
+                (request, _) =>
+                {
+                    var saved = new AgentOperatingStateResponse(
+                        Guid.NewGuid(), request.StateKey, request.SchemaId, request.SchemaVersion,
+                        request.Status, request.SourceRevisions, request.ConditionCodes,
+                        request.DecisionFingerprint, request.OpenCommitmentCorrelations,
+                        request.AttentionReviewId, request.Payload,
+                        stored.GetValueOrDefault(request.StateKey)?.Revision + 1 ?? 1,
+                        DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+                    stored[request.StateKey] = saved;
+                    return Task.FromResult(saved);
+                })
+            .RegisterCapability<ResourceChangeProposalRequest, ResourceChangeRequestResponse>(
+                PlatformCapabilities.ResourceChangePropose,
+                (request, _) =>
+                {
+                    proposal = request;
+                    return Task.FromResult(new ResourceChangeRequestResponse(
+                        staffingRequestId, organizationId, employeeId, installationId, managerId,
+                        request.ConversationId, request.ChatTurnId, request.ProductGoal, request.Rationale,
+                        request.ContextRevision, request.Roles, [], request.Assumptions, request.Constraints,
+                        request.SupersedesRequestId, "Pending", "Pending", null,
+                        DateTimeOffset.UtcNow, null)
+                    {
+                        TeamKey = request.TeamKey,
+                        TeamName = request.TeamName,
+                        TeamDescription = request.TeamDescription
+                    });
+                });
+        var context = runtime.CreateContext(
+            organizationId.ToString("D"), installationId.ToString("D"),
+            new AgentIdentity(employeeId.ToString("D"), "Creative Director", null,
+                "Creative Director", null, [], null, managerId.ToString("D"), "CEO"));
+        var item = PersonalItem(
+            "Create and submit the game-studio staffing plan",
+            CreativeDirectorAgenda.StaffingCorrelation(conversationId), conversationId);
+
+        var result = await new VideoGameCreativeDirectorAgent().HandlePersonalTodoAsync(
+            item, context, CancellationToken.None);
+
+        Assert.NotNull(proposal);
+        Assert.Equal(conversationId, proposal!.ConversationId);
+        Assert.Equal(sourceTurnId, proposal.ChatTurnId);
+        Assert.Equal(14, proposal.Roles.Count);
+        Assert.Equal($"video-game-studio-plan:{state.AcceptedVision.Digest}", proposal.IdempotencyKey);
+        Assert.Equal(PersonalTodoResult.Completed(
+            $"Submitted governed game-studio staffing plan {staffingRequestId:D} for approval and fulfillment."), result);
+        var savedState = stored[stateKey].Payload.Deserialize<CreativeDirectorOperatingState>(
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.Equal(staffingRequestId, savedState?.StaffingRequestId);
+        Assert.Equal(CreativeDirectorPhase.TeamPlanPending, savedState?.Phase);
+    }
+
+    [Fact]
     public async Task DocumentApprovalEventLocksTheExactPitchAndContinuesTheAgenda()
     {
         var organizationId = Guid.NewGuid();
@@ -217,7 +314,6 @@ public sealed class CreativeDirectorInteractionTests
         var conversationId = Guid.NewGuid();
         var artifactId = Guid.NewGuid();
         var revisionId = Guid.NewGuid();
-        var staffingRequestId = Guid.NewGuid();
         var sourceTurnId = Guid.NewGuid();
         var sourceMessageId = Guid.NewGuid();
         const string hash = "exact-revision-hash";
@@ -230,7 +326,6 @@ public sealed class CreativeDirectorInteractionTests
             HighLevelLatestRevisionId = revisionId,
             HighLevelSourceTurnId = sourceTurnId,
             HighLevelSourceMessageId = sourceMessageId,
-            StaffingRequestId = staffingRequestId,
             Proposals = [new GamePitchRevision(1, "# Pitch", "pitch-digest", DateTimeOffset.UtcNow, [], [])]
         };
         var portfolio = new CreativeDirectorPortfolioIndex
@@ -246,6 +341,8 @@ public sealed class CreativeDirectorInteractionTests
                 VideoGameCreativeDirectorAgent.PortfolioStateKey, portfolio)
         };
         var confirmations = new List<string>();
+        AddPersonalTodoItemRequest? staffingTodoRequest = null;
+        PersonalTodoItem? staffingTodo = null;
         var runtime = new AgentTestRuntime()
             .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(
                 PlatformCapabilities.AgentOperatingStateRead,
@@ -281,9 +378,14 @@ public sealed class CreativeDirectorInteractionTests
                         Guid.NewGuid(), 1, conversationId, employeeId, "Creative Director", "Agent",
                         confirmations[^1], DateTimeOffset.UtcNow));
                 })
-            .RegisterCapability<ResourceChangeReadRequest, ResourceChangeReadResponse>(
-                PlatformCapabilities.ResourceChangeRead,
-                (_, _) => Task.FromResult(new ResourceChangeReadResponse([])));
+            .RegisterCapability<AddPersonalTodoItemRequest, PersonalTodoItem>(
+                PersonalTodoCapabilities.Add,
+                (request, _) =>
+                {
+                    staffingTodoRequest = request;
+                    staffingTodo = PersonalItem(request.Title, request.CorrelationId!, conversationId);
+                    return Task.FromResult(staffingTodo);
+                });
         var context = runtime.CreateContext(
             organizationId.ToString("D"), Guid.NewGuid().ToString("D"),
             new AgentIdentity(employeeId.ToString("D"), "Creative Director", null,
@@ -310,7 +412,15 @@ public sealed class CreativeDirectorInteractionTests
         Assert.Equal(hash, savedState.AcceptedVision.ArtifactRevisionHash);
         Assert.Equal(sourceTurnId, savedState.AcceptedVision.ChatTurnId);
         Assert.Equal(sourceMessageId, savedState.AcceptedVision.MessageId);
+        Assert.Equal(staffingTodo?.Id, savedState.StaffingTodoId);
+        Assert.NotNull(staffingTodoRequest);
+        Assert.Equal("Create and submit the game-studio staffing plan", staffingTodoRequest!.Title);
+        Assert.Equal($"creative-staffing-plan:{conversationId:N}", staffingTodoRequest.IdempotencyKey);
+        Assert.Equal(CreativeDirectorAgenda.StaffingCorrelation(conversationId), staffingTodoRequest.CorrelationId);
+        Assert.Equal(conversationId, staffingTodoRequest.SourceConversationId);
+        Assert.Equal(sourceMessageId, staffingTodoRequest.SourceMessageId);
         Assert.Contains(confirmations, message => message.Contains("vision is locked", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(confirmations, message => message.Contains("personal task", StringComparison.OrdinalIgnoreCase));
     }
 
     private static AgentOperatingStateResponse OperatingState<T>(string key, T payload) =>

@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.2.4`
+- Version: `1.2.5`
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`
@@ -16,7 +16,7 @@ Provide durable video game vision and creative leadership from discovery through
 - Network access: none
 
 The agent has no credentials and requests no unrestricted filesystem, hiring, spending, marketplace,
-or web authority. It can propose one governed Product Manager staffing plan, but it cannot approve,
+or web authority. It can propose one governed 14-role game-studio staffing plan, but it cannot approve,
 source, install, spend, or claim that hiring is complete.
 
 ## Lifecycle
@@ -33,14 +33,16 @@ the Creative Director to originate concepts. The agent does not submit staffing 
 references are passed to the configured model through opaque, broker-validated media references;
 operating state and memory retain metadata and digests only, never raw files or private paths.
 
-Delegated mode lets the Creative Director lock the initial vision and submit the PM plan on the
+Delegated mode lets the Creative Director lock the initial vision and start the governed staffing plan on the
 manager's first substantive turn. In review modes, each pitch revision produces exactly one concise
 Creative Director message with the exact submitted document attached. Review and change requests
 live in the document workspace; the attachment's More menu may approve that same exact revision as
 a convenience shortcut, but the agent does not create a duplicate multiple-choice card. The agent
 remains in `HighLevelReview` and emits no autonomous follow-up chat until the document revision is
-decided. The resulting exact-revision event wakes the agent, which verifies the artifact and revision
-before advancing. Requesting changes keeps the premise in review and captures bounded feedback
+decided. The resulting exact-revision event wakes the agent, verifies the artifact and revision,
+and creates one visible personal staffing-plan card before confirming the next step. That claimed
+card owns submission of the governed proposal, so interruption or capability failure remains visible
+and retryable. Requesting changes keeps the premise in review and captures bounded feedback
 before another revision is created. While pitch creation
 or revision is running, the active turn immediately shows a short conversational acknowledgement;
 the final review response replaces that provisional text instead of adding another permanent message.
@@ -50,8 +52,9 @@ approval preferences, reference guidance, supporting message IDs, and update tim
 
 Every formal pitch is revisioned and digest-bound. Only the authoritative manager can accept the
 latest exact digest except in explicitly delegated mode, where the Creative Director locks the
-initial revision. The plan contains exactly one Product Manager reporting directly to the Creative
-Director. After separately approved hiring, the agent hands that report a typed
+initial revision. The plan contains exactly 14 distinct accountable game-development roles, with
+the Producer as operational lead and the Creative Director supervising outside ordinary team
+membership. After separately approved hiring, the agent hands the Producer a typed
 `creative-direction.game-vision-brief.v1` artifact,
 and enters oversight only after an exact-digest, blocker-free
 `product-management.game-vision-acknowledgement.v1` response.

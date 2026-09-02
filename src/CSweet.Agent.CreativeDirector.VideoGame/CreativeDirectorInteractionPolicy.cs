@@ -56,12 +56,16 @@ internal static partial class CreativeDirectorInteractionPolicy
 internal static class CreativeDirectorAgenda
 {
     internal const string VisionKind = "creative-director.vision.v1";
+    internal const string StaffingKind = "creative-director.staffing-plan.v1";
     internal const string ChatActionKind = "creative-director.chat-action.v1";
     internal const string ProjectReviewKind = "creative-director.project-review.v1";
     internal const string CreativeRequestArtifactType = "creative-direction.request-response.v1";
 
     internal static string VisionCorrelation(Guid conversationId) =>
         $"{VisionKind}:{conversationId:N}";
+
+    internal static string StaffingCorrelation(Guid conversationId) =>
+        $"{StaffingKind}:{conversationId:N}";
 
     internal static string ChatActionCorrelation(Guid messageId) =>
         $"{ChatActionKind}:{messageId:N}";
@@ -72,6 +76,10 @@ internal static class CreativeDirectorAgenda
     internal static bool IsVision(PersonalTodoItem item) =>
         item.CorrelationId?.StartsWith($"{VisionKind}:", StringComparison.Ordinal) == true ||
         item.Title.Equals("Build the high-level game design document", StringComparison.OrdinalIgnoreCase);
+
+    internal static bool IsStaffing(PersonalTodoItem item) =>
+        item.CorrelationId?.StartsWith($"{StaffingKind}:", StringComparison.Ordinal) == true ||
+        item.Title.Equals("Create and submit the game-studio staffing plan", StringComparison.OrdinalIgnoreCase);
 
     internal static bool IsChatAction(PersonalTodoItem item) =>
         item.CorrelationId?.StartsWith($"{ChatActionKind}:", StringComparison.Ordinal) == true;

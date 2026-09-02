@@ -28,7 +28,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.2.4";
+    public override string Version => "1.2.5";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -246,6 +246,46 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                     : "The game direction is durable; waiting for the next chat turn to produce or retry the high-level GDD.";
             return PersonalTodoResult.WaitingUntil(
                 DateTimeOffset.UtcNow.AddHours(4), reason, waitingOn);
+        }
+
+        if (CreativeDirectorAgenda.IsStaffing(item))
+        {
+            if (!item.SourceConversationId.HasValue)
+                return PersonalTodoResult.Blocked("A staffing-plan task requires its source project conversation.");
+
+            var current = await ReadStateForConversationAsync(
+                item.SourceConversationId, context, cancellationToken);
+            if (current.State.AcceptedVision is null)
+                return PersonalTodoResult.WaitingUntil(
+                    DateTimeOffset.UtcNow.AddHours(4),
+                    "Waiting for the authoritative manager to accept an exact high-level GDD revision.");
+
+            try
+            {
+                await ReconcileAsync(
+                    item.Id, context, cancellationToken, current.State, current.Revision,
+                    allowStaffingProposal: true);
+            }
+            catch (Exception exception) when (IsRecoverableAgendaFailure(exception, cancellationToken))
+            {
+                return PersonalTodoResult.WaitingUntil(
+                    DateTimeOffset.UtcNow.AddMinutes(15),
+                    $"Staffing-plan submission is waiting on a temporarily unavailable platform dependency: {exception.Message}");
+            }
+            catch (PlatformCapabilityException exception)
+            {
+                return PersonalTodoResult.Blocked(
+                    $"Staffing-plan submission cannot complete with the current platform authority: {exception.Message}");
+            }
+
+            current = await ReadStateForConversationAsync(
+                item.SourceConversationId, context, cancellationToken);
+            return current.State.StaffingRequestId.HasValue
+                ? PersonalTodoResult.Completed(
+                    $"Submitted governed game-studio staffing plan {current.State.StaffingRequestId.Value:D} for approval and fulfillment.")
+                : PersonalTodoResult.WaitingUntil(
+                    DateTimeOffset.UtcNow.AddMinutes(15),
+                    "The accepted vision is durable, but the governed staffing proposal has not been persisted yet.");
         }
 
         if (CreativeDirectorAgenda.IsProjectReview(item))
@@ -675,10 +715,11 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 $"vision-accepted:{latest.Digest}", context, cancellationToken);
             if (saved.State.VisionTodoId.HasValue)
                 await TryRequeuePersonalTodoAsync(saved.State.VisionTodoId.Value, context, cancellationToken);
+            _ = await EnsureStaffingTodoAsync(
+                Guid.NewGuid(), saved.State, saved.Revision, context, cancellationToken);
             await stream.CommitAsync(
-                $"Vision revision {latest.Revision} (`{latest.Digest}`) is accepted. I’ll now submit the dedicated 14-role game-studio staffing plan and wait for governed approval and fulfillment.",
+                $"Vision revision {latest.Revision} (`{latest.Digest}`) is accepted. I created a personal task to prepare and submit the dedicated 14-role game-studio staffing plan; I’ll continue from that task and bring you the governed proposal.",
                 cancellationToken);
-            await ReconcileAsync(Guid.NewGuid(), context, cancellationToken, saved.State, saved.Revision);
             return;
         }
 
@@ -816,7 +857,8 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             {
                 if (saved.State.VisionTodoId.HasValue)
                     await TryRequeuePersonalTodoAsync(saved.State.VisionTodoId.Value, context, cancellationToken);
-                await ReconcileAsync(Guid.NewGuid(), context, cancellationToken, saved.State, saved.Revision);
+                _ = await EnsureStaffingTodoAsync(
+                    Guid.NewGuid(), saved.State, saved.Revision, context, cancellationToken);
             }
             return;
         }
@@ -1190,6 +1232,32 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             CausationId: incoming.MessageId.ToString("D")), cancellationToken);
     }
 
+    private async Task<(CreativeDirectorOperatingState State, long? Revision)> EnsureStaffingTodoAsync(
+        Guid reviewId,
+        CreativeDirectorOperatingState state,
+        long? revision,
+        AgentRuntimeContext context,
+        CancellationToken cancellationToken)
+    {
+        if (state.AcceptedVision is null || state.StaffingRequestId.HasValue || state.StaffingTodoId.HasValue)
+            return (state, revision);
+
+        var accepted = state.AcceptedVision;
+        var todo = await context.Platform.PersonalTodo.AddAsync(new AddPersonalTodoItemRequest(
+            "Create and submit the game-studio staffing plan",
+            "Prepare the dedicated 14-role team required to deliver the accepted game vision, then submit the exact hiring and team-formation proposal through governed resource-change approval. Complete this task only after the proposal is durably recorded.",
+            WorkPriorities.High,
+            null,
+            $"creative-staffing-plan:{accepted.ConversationId:N}",
+            SourceConversationId: accepted.ConversationId,
+            SourceMessageId: accepted.MessageId,
+            CorrelationId: CreativeDirectorAgenda.StaffingCorrelation(accepted.ConversationId),
+            CausationId: accepted.ArtifactRevisionId.ToString("D")), cancellationToken);
+        return await SaveStateAsync(
+            state with { StaffingTodoId = todo.Id }, revision, reviewId,
+            $"staffing-todo:{accepted.ConversationId:N}:{todo.Id:N}", context, cancellationToken);
+    }
+
     private static async Task TryRequeuePersonalTodoAsync(
         Guid todoId,
         AgentRuntimeContext context,
@@ -1226,7 +1294,8 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         AgentRuntimeContext context,
         CancellationToken cancellationToken,
         CreativeDirectorOperatingState? suppliedState = null,
-        long? suppliedRevision = null)
+        long? suppliedRevision = null,
+        bool allowStaffingProposal = false)
     {
         var current = suppliedState is null
             ? await ReadStateAsync(context, cancellationToken)
@@ -1243,6 +1312,13 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
 
         if (state.StaffingRequestId is null)
         {
+            if (!allowStaffingProposal)
+            {
+                _ = await EnsureStaffingTodoAsync(
+                    reviewId, state, revision, context, cancellationToken);
+                return;
+            }
+
             var creativeDirectorId = Guid.Parse(context.Identity?.EmployeeId
                 ?? throw new InvalidOperationException("The Creative Director employee identity is unavailable."));
             var request = await context.Platform.ProposeResourceChangeAsync(new ResourceChangeProposalRequest(
@@ -1266,6 +1342,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 $"staffing-plan:{request.Id:N}", context, cancellationToken);
             state = saved.State;
             revision = saved.Revision;
+            return;
         }
 
         var resource = (await context.Platform.ReadResourceChangesAsync(
@@ -2448,6 +2525,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             HighLevelLatestRevisionId = desired.HighLevelLatestRevisionId ?? latest.HighLevelLatestRevisionId,
             HighLevelAcceptedRevisionId = desired.HighLevelAcceptedRevisionId ?? latest.HighLevelAcceptedRevisionId,
             DetailedDesignPackageId = desired.DetailedDesignPackageId ?? latest.DetailedDesignPackageId,
+            StaffingTodoId = desired.StaffingTodoId ?? latest.StaffingTodoId,
             StaffingRequestId = desired.StaffingRequestId ?? latest.StaffingRequestId,
             ProducerEmployeeId = desired.ProducerEmployeeId ?? latest.ProducerEmployeeId,
             SpecialistEmployeeIds = desired.SpecialistEmployeeIds.Count > 0
@@ -2859,12 +2937,13 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             $"vision-accepted:{exact.Id:N}:{exact.ContentSha256}", context, cancellationToken);
         if (saved.State.VisionTodoId.HasValue)
             await TryRequeuePersonalTodoAsync(saved.State.VisionTodoId.Value, context, cancellationToken);
+        _ = await EnsureStaffingTodoAsync(
+            message.EventId, saved.State, saved.Revision, context, cancellationToken);
         await context.Platform.Communication.SendMessageAsync(
             state.IntakeConversationId.Value,
-            $"I recorded your approval of game pitch revision {latest.Revision}. The vision is locked, and I’m moving on to the governed studio staffing plan.",
+            $"I recorded your approval of game pitch revision {latest.Revision}. The vision is locked, and I created a personal task to prepare and submit the governed studio staffing plan. I’ll continue from that task and bring you the proposal.",
             $"vision-accepted-confirmed:{exact.Id:N}",
             cancellationToken);
-        await ReconcileAsync(message.EventId, context, cancellationToken, saved.State, saved.Revision);
     }
 
     internal static string BuildPitchReviewMessage(int revision) =>

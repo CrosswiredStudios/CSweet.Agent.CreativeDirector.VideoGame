@@ -9,7 +9,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "C-Sweet Video Game Creative Director",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "publisher": { "id": "com.csweet", "name": "C-Sweet" },
   "runtime": {
     "type": "dotnet-project",
@@ -114,7 +114,7 @@
     { "name": "platform.artifact-package.read.v1", "scope": "organization", "purpose": "Review only a package whose member documents are individually granted." },
     { "name": "platform.artifact-package.decide.v1", "scope": "organization", "purpose": "Accept a complete detailed design package when exact-file decision grants exist." },
     { "name": "work.personal-todo.read.v1", "scope": "organization", "purpose": "Inspect this installation's own durable Creative Director agenda and correlate waiting work." },
-    { "name": "work.personal-todo.add.v1", "scope": "organization", "purpose": "Track the high-level GDD and authenticated chat-created creative obligations as durable personal work." },
+    { "name": "work.personal-todo.add.v1", "scope": "organization", "purpose": "Track the high-level GDD, governed staffing-plan submission, and authenticated chat-created creative obligations as durable personal work." },
     { "name": "work.personal-todo.requeue.v1", "scope": "organization", "purpose": "Resume this installation's waiting or blocked agenda card when its exact chat or decision dependency changes." },
     { "name": "work.personal-todo.claim.v1", "scope": "organization", "purpose": "Allow the SDK to atomically claim this installation's next Ready Creative Director agenda card." },
     { "name": "work.personal-todo.complete.v1", "scope": "organization", "purpose": "Allow the SDK to complete this installation's agenda card only after its external effects succeed." },
