@@ -1,6 +1,6 @@
 # Deterministic Creative Director Operating Model
 
-**Status:** Version 1.2.0 implementation baseline and forward design  
+**Status:** Version 1.2.2 implementation baseline and forward design
 **Scope:** `CSweet.Agent.CreativeDirector.VideoGame`  
 **Purpose:** Define an inspectable, partially deterministic operating model for a video game Creative Director agent from initial hire through concurrent project supervision, launch, live operations, expansions, sequels, and closure.
 
@@ -21,7 +21,7 @@ The goal is not deterministic creative output. The goal is deterministic intent,
 
 ## 2. Current-state assessment
 
-Version 1.2.0 establishes the first executable slice of this model. The agent now has:
+Version 1.2.2 establishes the current executable slice of this model. The agent now has:
 
 - An explicit Creative Director lifecycle.
 - Exact artifact revisions and hashes.
@@ -424,7 +424,19 @@ Explore in notebook
 
 Exploration remains non-authoritative until an exact revision is accepted. Conversational fragments must not silently become project authority.
 
-### 7.2 Durable document set
+### 7.2 Pitch review interaction contract
+
+The high-level pitch review is a single bounded interaction, not an agent-to-agent review loop:
+
+1. The Creative Director asks for the game description or receives an originating mandate.
+2. It creates and submits one exact pitch revision, assigns the authoritative manager as steward and reviewer, and remains in `HighLevelReview`.
+3. The platform attaches that exact revision to one concise Creative Director message. The same message presents only **Accept** and **Request changes**.
+4. The Creative Director does not send another message or create another revision until the manager answers.
+5. **Accept** locks the exact revision and advances the lifecycle. **Request changes** keeps the revision unaccepted, collects bounded feedback, and only then produces the next revision.
+
+Submitting a human-reviewed document must not enqueue an agent review turn. Submitting an artifact to its creator must never enqueue self-review. When a real agent is the reviewer, the system message must have an authenticated sender and render as C-Sweet system activity rather than `Unknown`. These platform rules prevent synthetic notifications from being mistaken for CEO instructions.
+
+### 7.3 Durable document set
 
 The desired document set includes:
 
@@ -1209,7 +1221,7 @@ Implementation tests should cover at least:
 
 The Creative Director should depend only on the typed SDK and granted platform capabilities. These platform sources are behavioral references for implementation and test design, not direct dependencies.
 
-## 17. Version 1.2.0 implementation boundary
+## 17. Version 1.2.2 implementation boundary
 
 The current implementation intentionally delivers a safe vertical slice rather than pretending the
 entire target operating model is complete.

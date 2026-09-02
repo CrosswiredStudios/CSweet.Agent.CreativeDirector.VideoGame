@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.2.1`
+- Version: `1.2.2`
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`
@@ -34,7 +34,11 @@ references are passed to the configured model through opaque, broker-validated m
 operating state and memory retain metadata and digests only, never raw files or private paths.
 
 Delegated mode lets the Creative Director lock the initial vision and submit the PM plan on the
-manager's first substantive turn. Milestone-review mode preserves explicit Accept/Refine/Replace.
+manager's first substantive turn. In review modes, each pitch revision produces exactly one concise
+Creative Director message with the exact submitted document attached and one **Accept** or
+**Request changes** decision. The agent remains in `HighLevelReview` and emits no autonomous
+follow-up chat until the manager chooses one of those actions. Requesting changes keeps the premise
+in review and prompts for bounded feedback before another revision is created.
 Collaborative mode supports iterative refinement until the manager locks an exact revision. The
 authoritative operating state stores the involvement mode, platform/genre constraints, story and
 approval preferences, reference guidance, supporting message IDs, and update time.

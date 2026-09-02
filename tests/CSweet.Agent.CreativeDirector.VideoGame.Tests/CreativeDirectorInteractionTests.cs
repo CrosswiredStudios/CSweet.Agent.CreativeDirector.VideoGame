@@ -176,6 +176,27 @@ public sealed class CreativeDirectorInteractionTests
         Assert.Equal(conversationId, captured.SourceConversationId);
     }
 
+    [Fact]
+    public void PitchReviewIsOneConciseMessageWithTwoBoundedDecisions()
+    {
+        var conversationId = Guid.NewGuid();
+        var turnId = Guid.NewGuid();
+        var request = VideoGameCreativeDirectorAgent.BuildPitchReviewRequest(
+            conversationId, turnId, 1, "pitch-digest");
+
+        Assert.Equal(conversationId, request.ConversationId);
+        Assert.Equal(turnId, request.ChatTurnId);
+        Assert.Equal("Review the first game pitch draft.", request.Prompt);
+        Assert.Collection(
+            request.Options,
+            option => Assert.Equal(("accept", "Accept"), (option.Id, option.Label)),
+            option => Assert.Equal(("revise", "Request changes"), (option.Id, option.Label)));
+        Assert.Equal("accept", request.RecommendedOptionId);
+        var message = VideoGameCreativeDirectorAgent.BuildPitchReviewMessage(1);
+        Assert.Contains("Open the attached document", message);
+        Assert.Contains("wait for your decision", message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static AgentOperatingStateResponse OperatingState<T>(string key, T payload) =>
         new(Guid.NewGuid(), key, "test", 1, "Active", new Dictionary<string, string>(), [],
             "fingerprint", [], Guid.NewGuid(), JsonSerializer.SerializeToElement(payload), 1,

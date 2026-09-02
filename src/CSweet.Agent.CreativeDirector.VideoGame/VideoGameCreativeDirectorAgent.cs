@@ -28,7 +28,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.2.1";
+    public override string Version => "1.2.2";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -714,12 +714,8 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             var digest = Digest(pitch);
             var disposition = InitialVisionDisposition(state.ManagerPreferences.InvolvementMode);
             var delegated = disposition == "LockAndStaff";
-            var collaborative = disposition == "IterateCollaboratively";
-            var decisionLine = collaborative
-                ? $"Collaborative revision **{revision}** (`{digest}`): **Lock vision**, **Continue refining**, or **Replace**."
-                : $"Decision for exact revision **{revision}** (`{digest}`): **Accept**, **Refine**, or **Replace**.";
-            var formal = $"{pitch.Trim()}\n\n---\n{decisionLine}";
-            var proposal = new GamePitchRevision(revision, formal, digest, DateTimeOffset.UtcNow,
+            var documentContent = pitch.Trim();
+            var proposal = new GamePitchRevision(revision, documentContent, digest, DateTimeOffset.UtcNow,
                 ExtractPositiveConstraints(currentMessage), references.Select(x => x.Sha256).Distinct().ToList());
             Guid? todoId = state.VisionTodoId;
             if (!todoId.HasValue)
@@ -733,33 +729,36 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 todoId = todo.Id;
             }
             ArtifactDocument document;
+            var managerOrganizationUserId = Guid.TryParse(
+                context.Identity?.ManagerEmployeeId, out var parsedManagerOrganizationUserId)
+                    ? parsedManagerOrganizationUserId
+                    : (Guid?)null;
             try
             {
                 if (!state.HighLevelArtifactId.HasValue)
                 {
                     document = await context.Platform.Artifacts.CreateAsync(new CreateArtifactDocument(
-                        "High-Level Game Design Document", formal, VideoGameArtifactTypeKeys.Vision,
-                        $"high-level-gdd-create:{conversationId:N}", OriginConversationId: conversationId), cancellationToken);
+                        "High-Level Game Design Document", documentContent, VideoGameArtifactTypeKeys.Vision,
+                        $"high-level-gdd-create:{conversationId:N}", OriginConversationId: conversationId,
+                        StewardOrganizationUserId: managerOrganizationUserId), cancellationToken);
                 }
                 else
                 {
                     _ = await context.Platform.Artifacts.ReviseAsync(new CreateArtifactRevision(
-                        state.HighLevelArtifactId.Value, state.HighLevelLatestRevisionId!.Value, formal,
+                        state.HighLevelArtifactId.Value, state.HighLevelLatestRevisionId!.Value, documentContent,
                         $"high-level-gdd-revision:{digest}"), cancellationToken);
                     document = await context.Platform.Artifacts.GetAsync(state.HighLevelArtifactId.Value, cancellationToken);
                 }
                 var pendingRevision = document.Revisions.MaxBy(x => x.Number)!;
                 document = await context.Platform.Artifacts.SubmitAsync(new SubmitArtifactRevision(
                     document.Id, pendingRevision.Id, $"high-level-gdd-submit:{pendingRevision.Id:N}",
-                    conversationId, Guid.TryParse(context.Identity?.EmployeeId, out var submittingReviewerEmployeeId)
-                        ? submittingReviewerEmployeeId
-                        : null), cancellationToken);
+                    conversationId, managerOrganizationUserId), cancellationToken);
             }
             catch (PlatformCapabilityException exception) when (
                 exception.Capability.StartsWith("platform.artifact.", StringComparison.Ordinal))
             {
                 await stream.CommitAsync(
-                    $"{formal}\n\nI generated the pitch, but could not persist its high-level GDD because the Creative Director's document grant is unavailable. The direction remains saved; approve the organization-level document-create grant and retry. ({exception.Message})",
+                    $"{documentContent}\n\nI generated the pitch, but could not persist its high-level GDD because the Creative Director's document grant is unavailable. The direction remains saved; approve the organization-level document-create grant and retry. ({exception.Message})",
                     cancellationToken);
                 return;
             }
@@ -803,25 +802,12 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             };
             if (!delegated)
             {
-                _ = await context.Platform.AskUserAsync(new AskUserRequest(
-                    conversationId, incoming.TurnId,
-                    $"Decide game pitch revision {revision} ({digest}).",
-                    collaborative
-                        ? [
-                            new("lock", "Lock vision", "Lock this exact pitch and begin governed staffing."),
-                            new("refine", "Continue refining", "Iterate together while preserving accepted constraints."),
-                            new("replace", "Replace", "Keep positive constraints but propose a materially different game.")
-                        ]
-                        : [
-                            new("accept", "Accept", "Lock this exact pitch digest as the authoritative game vision."),
-                            new("refine", "Refine", "Preserve the premise and revise selected details."),
-                            new("replace", "Replace", "Keep positive constraints but propose a materially different game.")
-                        ],
-                    collaborative ? "refine" : "accept", $"pitch-decision:{digest}"), cancellationToken);
+                _ = await context.Platform.AskUserAsync(BuildPitchReviewRequest(
+                    conversationId, incoming.TurnId, revision, digest), cancellationToken);
             }
             var saved = await SaveStateAsync(state, current.Revision, Guid.NewGuid(),
                 $"pitch-revision:{digest}", context, cancellationToken);
-            await stream.CommitAsync($"{formal}\n\n[Open the live high-level GDD](/organizations/{context.BusinessId}/documents?artifact={document.Id:D})", cancellationToken);
+            await stream.CommitAsync(BuildPitchReviewMessage(revision), cancellationToken);
             if (artifactAccepted)
             {
                 if (saved.State.VisionTodoId.HasValue)
@@ -2773,8 +2759,26 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     private static bool ContainsAny(string value, params string[] candidates) =>
         candidates.Any(x => value.Contains(x, StringComparison.OrdinalIgnoreCase));
 
+    internal static AskUserRequest BuildPitchReviewRequest(
+        Guid conversationId, Guid turnId, int revision, string digest) =>
+        new(conversationId, turnId,
+            revision == 1 ? "Review the first game pitch draft." : $"Review game pitch revision {revision}.",
+            [
+                new("accept", "Accept", "Lock this exact document revision as the authoritative game vision."),
+                new("revise", "Request changes", "Keep the draft in review and tell the Creative Director what to revise.")
+            ],
+            "accept", $"pitch-decision:{digest}");
+
+    internal static string BuildPitchReviewMessage(int revision) =>
+        $"I created {(revision == 1 ? "the first draft" : $"revision {revision}")} of the game pitch and submitted it for your review. " +
+        "Open the attached document, then accept it or request changes below. " +
+        "I’ll wait for your decision before continuing.";
+
     private static bool IsExplicitRejection(string value) =>
         value.Contains("replace", StringComparison.OrdinalIgnoreCase) ||
+        value.Contains("request changes", StringComparison.OrdinalIgnoreCase) ||
+        value.Contains("revise", StringComparison.OrdinalIgnoreCase) ||
+        value.Contains("refine", StringComparison.OrdinalIgnoreCase) ||
         value.Contains("reject", StringComparison.OrdinalIgnoreCase) ||
         value.Contains("start over", StringComparison.OrdinalIgnoreCase);
 
@@ -2831,6 +2835,6 @@ Keep the entire pitch under 650 words, use concise bullets, and return only the 
 12. Risks, assumptions, and open decisions
 13. Reference-derived observations
 
-Do not invent claims about references you cannot perceive. Preserve positive constraints from earlier revisions, but when replacement is requested create a materially different premise. Do not include the Accept/Refine/Replace decision line; the runtime appends an exact-revision decision.
+Do not invent claims about references you cannot perceive. Preserve positive constraints from earlier revisions, but when replacement is requested create a materially different premise. Do not include an approval decision line; the platform presents Accept and Request changes for the exact submitted revision.
 """;
 }
