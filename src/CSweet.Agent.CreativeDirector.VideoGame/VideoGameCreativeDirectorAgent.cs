@@ -28,7 +28,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.2.6";
+    public override string Version => "1.4.0";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -105,6 +105,12 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                     SubordinateReports = current.State.SubordinateReports.Append(report).TakeLast(30).ToList()
                 }, current.Revision, Guid.NewGuid(), $"subordinate-report:{message.EventId}", context, cancellationToken);
             }
+            return;
+        }
+
+        if (string.Equals(message.EventType, ManagementEvents.ResourceChangeRequested, StringComparison.Ordinal))
+        {
+            await DecideProducerCapacityRequestAsync(message, context, cancellationToken);
             return;
         }
 
@@ -393,6 +399,19 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             if (acknowledgement is { Acknowledged: true, Blockers.Count: 0 } &&
                 string.Equals(acknowledgement.AcceptedPitchDigest, accepted.Digest, StringComparison.OrdinalIgnoreCase))
             {
+                if (acknowledgement.PlanningPackageId is not { } packageId ||
+                    acknowledgement.PlanningPackageVersion is not { } packageVersion)
+                    return AgentCoordinationTurnResult.Blocked(
+                        "The Producer acknowledgement must include the submitted exact planning package.");
+                var package = await context.Platform.Artifacts.GetPackageAsync(packageId, cancellationToken);
+                if (package.Version != packageVersion ||
+                    !package.Members.Any(member => member.ArtifactId == acknowledgement.HighLevelGddArtifactId &&
+                                                   member.AcceptedRevisionId == acknowledgement.HighLevelGddAcceptedRevisionId))
+                    return AgentCoordinationTurnResult.Blocked(
+                        "The submitted planning package does not bind the acknowledged high-level GDD revision.");
+                if (!string.Equals(package.Status, "Accepted", StringComparison.OrdinalIgnoreCase))
+                    _ = await context.Platform.Artifacts.DecidePackageAsync(package.Id,
+                        $"creative-director-planning-package:{package.Id:N}:{package.Version}", cancellationToken);
                 var fingerprint = $"vision-handoff-acknowledged:{accepted.Digest}";
                 var isNewMilestone = !current.State.NotificationFingerprints.Contains(
                     fingerprint, StringComparer.Ordinal);
@@ -1445,6 +1464,8 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         state = state with { Phase = CreativeDirectorPhase.DetailedDesign };
         if (state.HandoffSessionId is null)
         {
+            var acceptedGdd = await context.Platform.Artifacts.GetAsync(state.HighLevelArtifactId!.Value, cancellationToken);
+            var acceptedGddRevision = acceptedGdd.Revisions.Single(x => x.Id == state.HighLevelAcceptedRevisionId);
             var brief = new GameVisionBrief(
                 acceptedVision.Digest,
                 "Deliver the player promise and measurable outcomes in the accepted pitch.",
@@ -1457,7 +1478,8 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 [])
             {
                 HighLevelGddArtifactId = state.HighLevelArtifactId,
-                HighLevelGddAcceptedRevisionId = state.HighLevelAcceptedRevisionId
+                HighLevelGddAcceptedRevisionId = state.HighLevelAcceptedRevisionId,
+                HighLevelGddRevisionSha256 = acceptedGddRevision.ContentSha256
             };
             var artifact = new AgentCoordinationArtifactSubmission(
                 VisionBriefArtifactType, "1.0", acceptedVision.Digest, 1, true,
@@ -2229,46 +2251,46 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         [
             Role(VideoGameRoleKeys.Producer, "Video Game Producer",
                 "Lead the project board, sprints, schedule, budget, dependencies, staffing, risks, and team reporting.",
-                "video-game.producer.execute.v1", 1, creativeDirectorOrganizationUserId, true),
+                 WorkManagementCapabilityNames.ExecutionRunV1, 1, creativeDirectorOrganizationUserId, true),
             Role(VideoGameRoleKeys.GameDesigner, "Game Designer",
                 "Own gameplay systems, mechanics, progression, balance, prototype hypotheses, and content rules.",
-                "video-game.game-designer.execute.v1", 2, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRunV1, 2, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.TechnicalDirector, "Video Game Technical Director",
                 "Own engine feasibility, architecture, performance budgets, technical standards, and technical approvals.",
-                "video-game.technical-director.execute.v1", 2, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRunV1, 2, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.Engineer, "Video Game Engineer",
                 "Implement gameplay and runtime code, tests, integrations, source-control delivery, and build fixes.",
-                "video-game.engineer.execute.v1", 3, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRunV1, 3, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.QualityAssurance, "Video Game QA",
                 "Own test plans, reproducible defects, regression, compatibility, accessibility checks, and validation evidence.",
-                "video-game.qa.execute.v1", 3, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRunV1, 3, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.PlaytestResearcher, "Video Game Playtest Researcher",
                 "Own consent-governed player evaluation plans, scripts, reports, evidence, and actionable findings.",
-                "video-game.playtest-researcher.execute.v1", 4, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRunV1, 4, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.ArtDirector, "Video Game Art Director",
                 "Own the art bible, visual targets, asset briefs, consistency review, and final visual findings.",
-                "video-game.art-director.execute.v1", 4, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRunV1, 4, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.Artist, "Video Game Artist",
                 "Create and curate authorized provided, procedural, or generative assets under the durable asset strategy.",
-                "video-game.artist.execute.v1", 5, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRunV1, 5, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.TechnicalArtist, "Video Game Technical Artist",
                 "Own import pipelines, shaders, materials, rigs, compression, engine readiness, and visual performance.",
-                "video-game.technical-artist.execute.v1", 5, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRunV1, 5, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.NarrativeDesigner, "Video Game Narrative Designer",
                 "Own world, story structure, characters, dialogue, narrative systems, and implementation specifications.",
-                "video-game.narrative-designer.execute.v1", 5, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRunV1, 5, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.AudioDesigner, "Video Game Audio Designer",
                 "Own audio direction, SFX/music/VO assets or briefs, implementation metadata, loudness, looping, and accessibility.",
-                "video-game.audio-designer.execute.v1", 5, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRunV1, 5, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.LevelDesigner, "Video Game Level Designer",
                 "Own level flows, encounters, pacing, content assembly, metrics, and playable level evidence.",
-                "video-game.level-designer.execute.v1", 5, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRunV1, 5, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.UserExperienceDesigner, "Video Game UI/UX/Accessibility Designer",
                 "Own flows, HUD, controls, alternatives, readability, usability, and accessibility acceptance.",
-                "video-game.ui-ux-accessibility.execute.v1", 4, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRunV1, 4, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.BuildReleaseEngineer, "Video Game Build/Release Engineer",
                 "Own CI/build configuration, certified adapter operations, packaging, release readiness, and publication proposals.",
-                "video-game.build-release-engineer.execute.v1", 3, creativeDirectorOrganizationUserId)
+                 WorkManagementCapabilityNames.ExecutionRunV1, 3, creativeDirectorOrganizationUserId)
         ];
     }
 
@@ -2863,6 +2885,85 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     {
         await stream.WriteDraftAsync(BuildPitchWorkAcknowledgement(revision), cancellationToken);
         await stream.FlushAsync(cancellationToken);
+    }
+
+    private static async Task DecideProducerCapacityRequestAsync(
+        AgentEventEnvelope message,
+        AgentRuntimeContext context,
+        CancellationToken cancellationToken)
+    {
+        var requested = message.Data.Deserialize<ResourceChangeDecisionEvent>();
+        if (requested is null || !Guid.TryParse(context.Identity?.EmployeeId, out var creativeDirectorId) ||
+            requested.ManagerOrganizationUserId != creativeDirectorId || requested.TeamId is not { } teamId ||
+            requested.WorkstreamId is not { } workstreamId)
+            return;
+        var resource = (await context.Platform.ReadResourceChangesAsync(
+            new ResourceChangeReadRequest(requested.RequestId), cancellationToken)).Requests.SingleOrDefault();
+        if (resource is null || resource.Status != "Pending") return;
+
+        var roster = (await context.Platform.ReadTeamRosterAsync(
+            new TeamRosterV2Request(teamId, workstreamId, 1, 200), cancellationToken)).Team;
+        var workstream = await context.Platform.ReadWorkstreamAsync(new ReadWorkstreamRequest(workstreamId), cancellationToken);
+        string? revisionReason = null;
+        if (roster is null || !Guid.TryParse(roster.LeadEmployeeId, out var teamLeadId) ||
+            teamLeadId != resource.RequesterOrganizationUserId)
+            revisionReason = "The requester is not the authoritative lead of the requesting team.";
+        else if (resource.ExpectedTeamRevision != roster.Revision)
+            revisionReason = "Refresh the proposal against the current team revision.";
+        else if (resource.Evidence.Count == 0 || string.IsNullOrWhiteSpace(resource.ExpectedEffect) ||
+                 resource.AlternativesConsidered.Count == 0)
+            revisionReason = "Provide current evidence, alternatives considered, and the forecasted effect.";
+
+        var boards = await context.Platform.Work.ListBoardsAsync(cancellationToken: cancellationToken);
+        var board = boards.SingleOrDefault(x => x.WorkstreamId == workstreamId && x.TeamId == teamId && !x.IsArchived);
+        WorkFlowMetricsReport? metrics = null;
+        if (revisionReason is null && board is not null)
+        {
+            metrics = await context.Platform.Work.ReadFlowMetricsAsync(new ReadWorkFlowMetricsRequest(board.Id)
+            {
+                TeamId = teamId,
+                WorkstreamId = workstreamId
+            }, cancellationToken);
+            if (!resource.Evidence.Any(x => x.SourceRevision == metrics.SourceRevision))
+                revisionReason = "Refresh the proposal with the current trusted flow-metrics source revision.";
+        }
+        else if (revisionReason is null)
+            revisionReason = "The requesting team has no authoritative workstream board.";
+
+        if (revisionReason is null && metrics is not null)
+        {
+            var activeProfileRoles = (workstream.StaffingRequirements ?? [])
+                .Where(x => x.IsActive).Select(x => x.RoleKey).ToHashSet(StringComparer.Ordinal);
+            foreach (var delta in resource.Deltas.Where(x => x.ChangeKind is "Add" or "Increase"))
+            {
+                if (!activeProfileRoles.Contains(delta.Role.RoleKey))
+                {
+                    revisionReason = $"Role '{delta.Role.RoleKey}' is not required by the active profile.";
+                    break;
+                }
+                var vacant = !roster!.Members.Any(x => x.IsAvailable &&
+                    x.DeclaredRoleKeys.Contains(delta.Role.RoleKey, StringComparer.Ordinal));
+                var role = metrics.Principals.Where(x => x.RoleKey == delta.Role.RoleKey)
+                    .OrderByDescending(x => x.CompletedStageCount).FirstOrDefault();
+                if (!vacant && (metrics.Team.CompletedSprintCount < 2 || role is null || role.CompletedStageCount < 10 ||
+                    resource.Evidence.Count(x => x.Kind == "sprint-review-pressure") < 2))
+                {
+                    revisionReason = $"Role '{delta.Role.RoleKey}' lacks two pressure reviews and the minimum trusted sample.";
+                    break;
+                }
+                if (!vacant && role!.ReworkRatePercent >= 20m)
+                {
+                    revisionReason = $"Role '{delta.Role.RoleKey}' shows rework pressure; submit an improvement commitment before capacity growth.";
+                    break;
+                }
+            }
+        }
+
+        _ = await context.Platform.DecideResourceChangeAsync(new ResourceChangeDecisionRequest(
+            resource.Id,
+            revisionReason is null ? ResourceChangeDecisionKinds.Approve : ResourceChangeDecisionKinds.RequestRevision,
+            revisionReason ?? "Approved as an evidence-backed team-capacity change; this does not authorize hiring or spending.",
+            $"creative-director-capacity-decision:{resource.Id:N}:{resource.ContextRevision}"), cancellationToken);
     }
 
     private async Task HandleArtifactRevisionDecidedAsync(

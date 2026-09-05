@@ -1,18 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <Version>1.2.6</Version>
+    <Version>1.4.0</Version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CSweet.Agent.SDK" Version="3.24.1" Condition="'$(UseLocalCSweetAgentSdk)' != 'true'" />
+    <PackageReference Include="CSweet.Agent.SDK" Version="3.27.0" Condition="'$(UseLocalCSweetAgentSdk)' != 'true'" />
     <PackageReference Include="CSweet.Memory" Version="0.1.2" Condition="'$(UseLocalCSweetMemory)' != 'true'" />
     <PackageReference Include="CSweet.Memory.Broker" Version="0.1.2" Condition="'$(UseLocalCSweetMemory)' != 'true'" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="CSweet.Agent.CreativeDirector.VideoGame.Tests" />
-    <PackageReference Include="CSweet.VideoGame.Contracts" Version="1.1.0" Condition="'$(UseLocalVideoGameContracts)' != 'true'" />
-    <PackageReference Include="CSweet.VideoGame.AgentKit" Version="1.0.0" Condition="'$(UseLocalVideoGameAgentKit)' != 'true'" />
+    <PackageReference Include="CSweet.VideoGame.Contracts" Version="1.3.0" Condition="'$(UseLocalVideoGameContracts)' != 'true'" />
+    <PackageReference Include="CSweet.VideoGame.AgentKit" Version="2.1.0" Condition="'$(UseLocalVideoGameAgentKit)' != 'true'" />
     <ProjectReference Include="..\CSweet.VideoGame.Contracts\CSweet.VideoGame.Contracts.csproj" Condition="'$(UseLocalVideoGameContracts)' == 'true'" />
     <ProjectReference Include="..\CSweet.VideoGame.AgentKit\CSweet.VideoGame.AgentKit.csproj" Condition="'$(UseLocalVideoGameAgentKit)' == 'true'" />
   </ItemGroup>

@@ -1,6 +1,6 @@
 # Deterministic Creative Director Operating Model
 
-**Status:** Version 1.2.6 implementation baseline and forward design
+**Status:** Version 1.4.0 implementation baseline and forward design
 **Scope:** `CSweet.Agent.CreativeDirector.VideoGame`  
 **Purpose:** Define an inspectable, partially deterministic operating model for a video game Creative Director agent from initial hire through concurrent project supervision, launch, live operations, expansions, sequels, and closure.
 
@@ -21,7 +21,7 @@ The goal is not deterministic creative output. The goal is deterministic intent,
 
 ## 2. Current-state assessment
 
-Version 1.2.6 establishes the current executable slice of this model. The agent now has:
+Version 1.4.0 establishes the current executable slice of this model. The agent now has:
 
 - An explicit Creative Director lifecycle.
 - Exact artifact revisions and hashes.
@@ -1240,7 +1240,7 @@ Implementation tests should cover at least:
 
 The Creative Director should depend only on the typed SDK and granted platform capabilities. These platform sources are behavioral references for implementation and test design, not direct dependencies.
 
-## 17. Version 1.2.6 implementation boundary
+## 17. Version 1.4.0 implementation boundary
 
 The current implementation intentionally delivers a safe vertical slice rather than pretending the
 entire target operating model is complete.

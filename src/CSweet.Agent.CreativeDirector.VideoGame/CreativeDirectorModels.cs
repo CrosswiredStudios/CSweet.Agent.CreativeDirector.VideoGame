@@ -63,16 +63,6 @@ public sealed record AcceptedGameVision(
     Guid MessageId,
     DateTimeOffset AcceptedAt);
 
-public sealed record ReferenceEvidence(
-    Guid AttachmentId,
-    Guid ConversationId,
-    Guid MessageId,
-    string FileName,
-    string ContentType,
-    long SizeBytes,
-    string Sha256,
-    string Observation);
-
 public sealed record PendingCreativeEscalation(
     Guid RequestingEmployeeId,
     Guid ConversationId,
@@ -140,27 +130,6 @@ public sealed record CreativeDirectorOperatingState
     public IReadOnlyList<string> NotificationFingerprints { get; init; } = [];
     public DateOnly? LastDailyReportDate { get; init; }
 }
-
-public sealed record GameVisionBrief(
-    string AcceptedPitchDigest,
-    string PlayerAndProductOutcome,
-    string GameplayLoopAndCreativePillars,
-    string PlatformAndStackConstraints,
-    string ArtNarrativeAudioAndToneDirection,
-    string MvpScopeAndNonGoals,
-    IReadOnlyList<ReferenceEvidence> ReferenceSummaries,
-    string SuccessCriteriaRisksAndAssumptions,
-    IReadOnlyList<string> OpenDecisions)
-{
-    public Guid? HighLevelGddArtifactId { get; init; }
-    public Guid? HighLevelGddAcceptedRevisionId { get; init; }
-}
-
-public sealed record GameVisionAcknowledgement(
-    string AcceptedPitchDigest,
-    bool Acknowledged,
-    IReadOnlyList<string> Blockers,
-    DateTimeOffset AcknowledgedAt);
 
 internal sealed record SemanticArtifactReview(
     string Disposition,

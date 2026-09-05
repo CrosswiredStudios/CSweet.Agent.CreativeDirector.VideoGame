@@ -2,6 +2,148 @@ using System.Text.Json;
 
 namespace CSweet.VideoGame.Contracts;
 
+public sealed record ReferenceEvidence(
+    Guid AttachmentId,
+    Guid ConversationId,
+    Guid MessageId,
+    string FileName,
+    string ContentType,
+    long SizeBytes,
+    string Sha256,
+    string Observation);
+
+public sealed record GameVisionBrief(
+    string AcceptedPitchDigest,
+    string PlayerAndProductOutcome,
+    string GameplayLoopAndCreativePillars,
+    string PlatformAndStackConstraints,
+    string ArtNarrativeAudioAndToneDirection,
+    string MvpScopeAndNonGoals,
+    IReadOnlyList<ReferenceEvidence> ReferenceSummaries,
+    string SuccessCriteriaRisksAndAssumptions,
+    IReadOnlyList<string> OpenDecisions)
+{
+    public Guid? HighLevelGddArtifactId { get; init; }
+    public Guid? HighLevelGddAcceptedRevisionId { get; init; }
+    public string? HighLevelGddRevisionSha256 { get; init; }
+}
+
+public sealed record GameVisionAcknowledgement(
+    string AcceptedPitchDigest,
+    bool Acknowledged,
+    IReadOnlyList<string> Blockers,
+    DateTimeOffset AcknowledgedAt)
+{
+    public Guid? HighLevelGddArtifactId { get; init; }
+    public Guid? HighLevelGddAcceptedRevisionId { get; init; }
+    public string? HighLevelGddRevisionSha256 { get; init; }
+    public Guid? PlanningPackageId { get; init; }
+    public int? PlanningPackageVersion { get; init; }
+}
+
+public sealed record GameProductionPlanningCycleV1(
+    Guid WorkstreamId,
+    Guid TeamId,
+    long TeamRevision,
+    Guid BoardId,
+    string ProfileDigest,
+    Guid ApprovedPackageId,
+    int ApprovedPackageVersion,
+    string ApprovedPackageDigest,
+    string LifecyclePhase,
+    string TargetMilestoneKey,
+    string PlanningFingerprint);
+
+public sealed record GameProposedWorkItemV1(
+    string ProposalKey,
+    string WorkItemTypeKey,
+    string Title,
+    string Description,
+    IReadOnlyList<string> AcceptanceCriteria,
+    string AccountableRoleKey,
+    IReadOnlyList<string> RequiredSpecializationKeys,
+    IReadOnlyList<string> PreferredSpecializationKeys,
+    IReadOnlyList<string> RequiredCapabilityKeys,
+    IReadOnlyList<string> DependencyProposalKeys)
+{
+    public string? ParentProposalKey { get; init; }
+}
+
+public sealed record GameDesignerBacklogProposalV1(
+    GameProductionPlanningCycleV1 Cycle,
+    IReadOnlyList<GameProposedWorkItemV1> PlayerOutcomes,
+    IReadOnlyList<string> DesignConstraints,
+    IReadOnlyList<string> OpenCreativeDecisions,
+    string ProposalDigest);
+
+public sealed record GameTechnicalDeliveryProposalV1(
+    GameProductionPlanningCycleV1 Cycle,
+    IReadOnlyList<GameProposedWorkItemV1> DeliveryItems,
+    IReadOnlyList<string> FeasibilityFindings,
+    IReadOnlyList<string> TechnicalConstraints,
+    IReadOnlyList<string> OpenFeasibilityDecisions,
+    string ProposalDigest);
+
+public sealed record ReconciledGameProductionPlanV1(
+    GameProductionPlanningCycleV1 Cycle,
+    string DesignerProposalDigest,
+    string TechnicalProposalDigest,
+    IReadOnlyList<GameProposedWorkItemV1> CanonicalItems,
+    IReadOnlyList<string> OutstandingAuthorityDecisions,
+    string ReconciledDigest);
+
+public sealed record GameRoleEstimateCapacityProposalV1(
+    Guid BoardId,
+    string RoleKey,
+    long PlanningRevision,
+    string PlanningDigest,
+    IReadOnlyList<GameWorkItemEstimateV1> Estimates,
+    decimal AvailableSprintCapacity,
+    IReadOnlyList<string> Assumptions,
+    IReadOnlyList<string> Blockers,
+    string ProposalDigest);
+
+public sealed record GameWorkItemEstimateV1(Guid WorkItemId, decimal EstimatePoints, string Confidence);
+
+public sealed record GameRoleEstimateCapacityRequestV1(
+    Guid BoardId,
+    string RoleKey,
+    long PlanningRevision,
+    string PlanningDigest,
+    IReadOnlyList<GameSprintCandidateV1> WorkItems,
+    string RequestFingerprint);
+
+public sealed record GameQaSprintReadinessRequestV1(
+    Guid BoardId,
+    long PlanningRevision,
+    string PlanningDigest,
+    IReadOnlyList<GameSprintCandidateV1> Candidates,
+    string RequestFingerprint);
+
+public sealed record GameSprintCandidateV1(
+    Guid WorkItemId,
+    string Title,
+    string AccountableRoleKey,
+    IReadOnlyList<string> Requirements,
+    IReadOnlyList<string> AcceptanceCriteria,
+    IReadOnlyList<string> Constraints,
+    IReadOnlyList<Guid> DependencyWorkItemIds,
+    string ArtifactPackageDigest,
+    string AssignmentDecisionFingerprint,
+    decimal? EstimatePoints = null,
+    string? EstimateSourceDigest = null);
+
+public sealed record GameQaSprintReadinessAssessmentV1(
+    Guid SprintId,
+    long PlanningRevision,
+    string PlanningDigest,
+    bool Ready,
+    IReadOnlyList<Guid> ReadyWorkItemIds,
+    IReadOnlyList<GameReadinessFindingV1> Findings,
+    string AssessmentDigest);
+
+public sealed record GameReadinessFindingV1(Guid? WorkItemId, string Code, bool Blocking, string Finding);
+
 public sealed record VideoGameProjectMetadataV1(
     string WorkingTitle,
     string Genre,
@@ -87,6 +229,47 @@ public static class VideoGameSpecializationKeys
     public const string Production = "game-production";
     public const string Gameplay = "gameplay-systems";
     public const string Content = "game-content";
+    public const string SprintPlanning = "sprint-planning";
+    public const string Forecasting = "delivery-forecasting";
+    public const string DependencyRiskCapacityManagement = "dependency-risk-capacity-management";
+    public const string Reporting = "management-reporting";
+    public const string GameDesign = "game-design";
+    public const string ProgressionBalance = "progression-balance";
+    public const string PrototypeDesign = "prototype-design";
+    public const string TechnicalFeasibility = "technical-feasibility";
+    public const string RuntimeArchitecture = "runtime-architecture";
+    public const string EngineIntegration = "engine-integration";
+    public const string PerformanceBudgets = "performance-budgets";
+    public const string TechnicalDecomposition = "technical-decomposition";
+    public const string GameplayProgramming = "gameplay-programming";
+    public const string AutomatedTesting = "automated-testing";
+    public const string BuildDiagnostics = "build-diagnostics";
+    public const string TestPlanning = "test-planning";
+    public const string BuildValidation = "build-validation";
+    public const string DefectReproduction = "defect-reproduction";
+    public const string RegressionTesting = "regression-testing";
+    public const string CompatibilityTesting = "compatibility-testing";
+    public const string AccessibilityTesting = "accessibility-testing";
+    public const string PlaytestPlanning = "playtest-planning";
+    public const string ResearchDesign = "research-design";
+    public const string ConsentGovernance = "consent-governance";
+    public const string ResearchAnalysis = "research-analysis";
+    public const string ArtDirection = "art-direction";
+    public const string AssetProduction = "asset-production";
+    public const string AssetPipelines = "asset-pipelines";
+    public const string VisualPerformance = "visual-performance";
+    public const string NarrativeDesign = "narrative-design";
+    public const string AudioDesign = "audio-design";
+    public const string LevelDesign = "level-design";
+    public const string UiUxAccessibility = "ui-ux-accessibility-design";
+    public const string BuildRelease = "build-release-engineering";
+    public const string Networking = "game-networking";
+    public const string Economy = "game-economy";
+    public const string Localization = "game-localization";
+    public const string SecurityPrivacy = "game-security-privacy";
+    public const string MarketingCommunity = "game-marketing-community";
+    public const string PlatformCertification = "platform-certification";
+    public const string LiveOperations = "live-operations";
 }
 
 public static class VideoGameWorkItemTypeKeys
