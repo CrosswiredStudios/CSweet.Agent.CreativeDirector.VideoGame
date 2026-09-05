@@ -79,7 +79,7 @@
   },
   "assignmentPolicy": {
     "exactRoleRequired": true,
-    "skillMatchMode": "required-then-preferred",
+    "skillMatchMode": "RequiredThenPreferred",
     "roles": [
       { "roleKey": "game-producer", "eligibleWorkItemTypeKeys": [], "defaultRelevantSpecializationKeys": ["game-production", "sprint-planning", "delivery-forecasting", "dependency-risk-capacity-management", "management-reporting"], "requiredCapabilityKeys": [] },
       { "roleKey": "game-designer", "eligibleWorkItemTypeKeys": ["video-game.task.v1", "video-game.research-spike.v1", "video-game.creative-review.v1"], "defaultRelevantSpecializationKeys": ["game-design", "gameplay-systems", "progression-balance", "game-content", "prototype-design"], "requiredCapabilityKeys": ["work.execution.run.v1"] },

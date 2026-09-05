@@ -62,6 +62,12 @@ public sealed class ManifestTests
         var root = profile.RootElement;
 
         Assert.Equal("video-game-production.v2", root.GetProperty("key").GetString());
+        var assignmentPolicy = System.Text.Json.JsonSerializer.Deserialize<WorkAssignmentPolicyTemplate>(
+            root.GetProperty("assignmentPolicy"),
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        Assert.NotNull(assignmentPolicy);
+        Assert.Contains(assignmentPolicy.SkillMatchMode, WorkSkillMatchModes.All);
+        Assert.Equal(WorkSkillMatchModes.RequiredThenPreferred, assignmentPolicy.SkillMatchMode);
         Assert.Equal("video-game-production-board.v2", root.GetProperty("defaultBoardProfileKey").GetString());
         Assert.True(root.GetProperty("lifecycle").GetProperty("stages").GetArrayLength() >= 13);
         Assert.True(root.GetProperty("workItemTypes").GetArrayLength() >= 7);
