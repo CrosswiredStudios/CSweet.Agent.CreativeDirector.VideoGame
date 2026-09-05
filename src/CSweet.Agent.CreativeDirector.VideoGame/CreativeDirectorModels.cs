@@ -1,5 +1,5 @@
 using CSweet.Agent.SDK;
-using CSweet.VideoGame.Contracts;
+using CrosswiredStudios.VideoGame.Contracts;
 
 namespace CSweet.Agent.CreativeDirector.VideoGame;
 

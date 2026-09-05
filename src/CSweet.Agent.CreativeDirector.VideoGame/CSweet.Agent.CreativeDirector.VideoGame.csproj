@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <Version>1.4.0</Version>
+    <Version>1.4.1</Version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
@@ -11,10 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="CSweet.Agent.CreativeDirector.VideoGame.Tests" />
-    <PackageReference Include="CSweet.VideoGame.Contracts" Version="1.3.0" Condition="'$(UseLocalVideoGameContracts)' != 'true'" />
-    <PackageReference Include="CSweet.VideoGame.AgentKit" Version="2.1.0" Condition="'$(UseLocalVideoGameAgentKit)' != 'true'" />
-    <ProjectReference Include="..\CSweet.VideoGame.Contracts\CSweet.VideoGame.Contracts.csproj" Condition="'$(UseLocalVideoGameContracts)' == 'true'" />
-    <ProjectReference Include="..\CSweet.VideoGame.AgentKit\CSweet.VideoGame.AgentKit.csproj" Condition="'$(UseLocalVideoGameAgentKit)' == 'true'" />
   </ItemGroup>
   <ItemGroup Condition="'$(UseLocalCSweetAgentSdk)' == 'true'">
     <ProjectReference Include="$(CSweetAgentSdkRepositoryRoot)\src\CSweet.Agent.SDK\CSweet.Agent.SDK.csproj" />
@@ -26,7 +22,10 @@
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
     <Content Include="..\..\csweet-plugin.json" Link="csweet-plugin.json" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="content\" />
-    <Content Include="..\..\profiles\video-game-production.v2.json" Link="profiles\video-game-production.v2.json"
+    <Content Include="..\..\profiles\video-game-production.v2.3.json" Link="profiles\video-game-production.v2.3.json"
              CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="content\profiles\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../extensions/video-game/*.cs" Link="Extension/%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

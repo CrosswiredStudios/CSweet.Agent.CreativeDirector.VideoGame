@@ -1,7 +1,7 @@
 using System.Text.Json;
 using CSweet.Agent.SDK;
 using CSweet.Memory;
-using CSweet.VideoGame.Contracts;
+using CrosswiredStudios.VideoGame.Contracts;
 
 namespace CSweet.Agent.CreativeDirector.VideoGame.Tests;
 

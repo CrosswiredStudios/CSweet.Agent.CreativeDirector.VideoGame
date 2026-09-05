@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace CSweet.VideoGame.Contracts;
+namespace CrosswiredStudios.VideoGame.Contracts;
 
 public sealed record ReferenceEvidence(
     Guid AttachmentId,
