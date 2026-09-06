@@ -9,7 +9,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "C-Sweet Video Game Creative Director",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "publisher": { "id": "com.csweet", "name": "C-Sweet" },
   "runtime": {
     "type": "dotnet-project",
@@ -25,8 +25,8 @@
     "provides": [
       {
         "key": "video-game-production.v2",
-        "version": 3,
-        "definitionResource": "profiles/video-game-production.v2.3.json"
+        "version": 4,
+        "definitionResource": "profiles/video-game-production.v2.4.json"
       }
     ],
     "requires": []
@@ -98,7 +98,7 @@
     { "name": "communication.coordination.respond.v1", "scope": "team", "purpose": "Answer reporting-tree creative questions and complete typed project coordination." },
     { "name": "communication.coordination.read.v1", "scope": "team", "purpose": "Recover durable Producer and specialist coordination sessions." },
     { "name": "communication.coordination.list.v1", "scope": "team", "purpose": "Reconcile the Creative Director's own handoff and clarification sessions." },
-    { "name": "platform.management.resource-change.propose.v1", "scope": "organization", "purpose": "Submit the 14-role dedicated game-studio staffing plan for governed approval." },
+    { "name": "platform.management.resource-change.propose.v1", "scope": "organization", "purpose": "Submit the Producer bootstrap staffing plan for governed approval." },
     { "name": "platform.management.resource-change.read.v1", "scope": "organization", "purpose": "Wait for and reconcile the dedicated project-team staffing decision." },
     { "name": "platform.management.resource-change.decide.v1", "scope": "team", "purpose": "Approve, request revision, or reject direct-report Producer capacity proposals after current evidence and profile validation." },
     { "name": "work.flow-metrics.read.v1", "scope": "team", "purpose": "Revalidate Producer capacity evidence against current trusted metrics." },
@@ -191,7 +191,7 @@
   "webAccess": { "mode": "None", "rules": [] },
   "ui": [],
   "catalog": {
-    "summary": "Owns video-game vision, forms and supervises dedicated 14-role project teams, selects certified toolchains with Technical Director evidence, and reviews exact production evidence.",
+    "summary": "Owns video-game vision, bootstraps Producer-led teams sized to project workload, selects certified toolchains with Technical Director evidence, and reviews exact production evidence.",
     "category": "Creative",
     "role": { "key": "video-game-creative-director", "name": "Video Game Creative Director" },
     "license": { "spdxId": "MIT" },

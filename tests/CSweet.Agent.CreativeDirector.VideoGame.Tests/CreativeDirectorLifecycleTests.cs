@@ -294,13 +294,13 @@ public sealed class CreativeDirectorLifecycleTests
     }
 
     [Fact]
-    public void StudioPlanContainsFourteenDistinctAccountableRolesLedByProducer()
+    public void StudioBootstrapRequiresOnlyProducer()
     {
         var creativeDirectorId = Guid.NewGuid();
         var roles = VideoGameCreativeDirectorAgent.BuildRequiredStudioRoles(creativeDirectorId);
 
-        Assert.Equal(14, roles.Count);
-        Assert.Equal(14, roles.Select(x => x.RoleKey).Distinct(StringComparer.Ordinal).Count());
+        Assert.Single(roles);
+        Assert.Single(roles.Select(x => x.RoleKey).Distinct(StringComparer.Ordinal));
         Assert.All(roles, role => Assert.Equal(1, role.Headcount));
         Assert.All(roles, role => Assert.InRange(role.Timing.Length, 1, 32));
         var producer = Assert.Single(roles, role => role.RoleKey == VideoGameRoleKeys.Producer);
@@ -360,8 +360,8 @@ public sealed class CreativeDirectorLifecycleTests
         {
             Assert.Equal(scenario.ExpectedRecipe,
                 VideoGameCreativeDirectorAgent.DetermineRequiredRecipe(scenario.State));
-            Assert.Equal(14, VideoGameCreativeDirectorAgent.BuildRequiredStudioRoles(Guid.NewGuid())
-                .Select(x => x.RoleKey).Distinct(StringComparer.Ordinal).Count());
+            Assert.Single(VideoGameCreativeDirectorAgent.BuildRequiredStudioRoles(Guid.NewGuid())
+                .Select(x => x.RoleKey).Distinct(StringComparer.Ordinal));
         });
 
         var milestones = VideoGameCreativeDirectorAgent.BuildLifecycleMilestones(DateTimeOffset.UtcNow);

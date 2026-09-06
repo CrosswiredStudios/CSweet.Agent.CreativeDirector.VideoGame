@@ -310,7 +310,7 @@ public sealed class CreativeDirectorInteractionTests
         Assert.NotNull(proposal);
         Assert.Equal(conversationId, proposal!.ConversationId);
         Assert.Equal(sourceTurnId, proposal.ChatTurnId);
-        Assert.Equal(14, proposal.Roles.Count);
+        Assert.Single(proposal.Roles);
         Assert.Equal($"video-game-studio-plan:{state.AcceptedVision.Digest}", proposal.IdempotencyKey);
         Assert.Equal(PersonalTodoResult.Completed(
             $"Submitted governed game-studio staffing plan {staffingRequestId:D} for approval and fulfillment."), result);

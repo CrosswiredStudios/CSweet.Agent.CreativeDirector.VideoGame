@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.4.1`
+- Version: `1.5.0`
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`
@@ -16,7 +16,7 @@ Provide durable video game vision and creative leadership from discovery through
 - Network access: none
 
 The agent has no credentials and requests no unrestricted filesystem, hiring, spending, marketplace,
-or web authority. It can propose one governed 14-role game-studio staffing plan, but it cannot approve,
+or web authority. It proposes a governed Producer bootstrap staffing plan, but it cannot approve,
 source, install, spend, or claim that hiring is complete.
 
 ## Lifecycle
@@ -52,9 +52,8 @@ approval preferences, reference guidance, supporting message IDs, and update tim
 
 Every formal pitch is revisioned and digest-bound. Only the authoritative manager can accept the
 latest exact digest except in explicitly delegated mode, where the Creative Director locks the
-initial revision. The plan contains exactly 14 distinct accountable game-development roles, with
-the Producer as operational lead and the Creative Director supervising outside ordinary team
-membership. After separately approved hiring, the agent hands the Producer a typed
+initial revision. The initial plan contains only the Producer as operational lead, with the Creative Director supervising outside ordinary team
+membership. The Producer proposes further roles from scoped work and capability gaps. As soon as the Producer is active, the agent hands over a typed
 `creative-direction.game-vision-brief.v1` artifact,
 and enters oversight only after an exact-digest, blocker-free
 `product-management.game-vision-acknowledgement.v1` response.
@@ -95,9 +94,18 @@ user/business memory, and supplied broker references. Explicit preferences and p
 may be proposed to governed memory immediately; inferred persona preferences are not persisted
 from a single observation and remain subject to platform approval.
 
-Built with `CSweet.Agent.SDK` 3.27.0, `CSweet.Memory` 0.1.2.
+Built with `CSweet.Agent.SDK` 3.28.0, `CSweet.Memory` 0.1.2.
 
 
 ## Extension ownership and isolated builds
 
 Game-specific payload helpers and decision logic live in the bundled `extensions/video-game` source snapshot under the publisher-owned `CrosswiredStudios.VideoGame` namespace. They are compiled into this agent, not published as C-Sweet platform contracts. The snapshot has versioned SHA-256 provenance and needs no sibling checkout or domain NuGet feed. C-Sweet handles generic coordination envelopes and profile metadata; agent permissions and existing wire type IDs remain unchanged.
+
+## Adaptive staffing (1.5.0 / production profile revision 4)
+
+New projects bootstrap only the Producer. The accepted vision and project board are handed over while
+technical leadership, assets, toolchains and delivery hires are still being arranged. The Producer owns
+workload-backed team proposals; the Creative Director reviews them against actual planning/backlog needs.
+Revision 4 requires only the Producer at project level and the technical lead for detailed decomposition.
+QA readiness and independent release verification remain required; hiring approval never authorizes spending or launch.
+Existing workstreams keep their pinned profile revision and are not silently migrated or downsized.
