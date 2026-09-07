@@ -11,7 +11,7 @@ using Microsoft.Extensions.Options;
 
 namespace CSweet.Agent.CreativeDirector.VideoGame;
 
-public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
+public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
 {
     public const string StateKey = "video-game-creative-direction";
     public const string PortfolioStateKey = "video-game-creative-direction:portfolio";
@@ -28,7 +28,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.5.1";
+    public override string Version => "1.6.1";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -372,6 +372,14 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     {
         var current = await ReadStateForCoordinationAsync(request, context, cancellationToken);
         var latestArtifact = request.Transcript.LastOrDefault(x => x.Artifact is not null)?.Artifact;
+        if (latestArtifact?.Type == CrosswiredStudios.VideoGame.PitchCollaboration.PitchProtocol.ReviewType)
+        {
+            var review = latestArtifact.Payload.Deserialize<CrosswiredStudios.VideoGame.PitchCollaboration.PitchReview>(
+                CrosswiredStudios.VideoGame.PitchCollaboration.PitchProtocol.Json);
+            if (review is null) return AgentCoordinationTurnResult.Blocked("The Producer pitch review is missing.");
+            return await ReviewProducerPitchAsync(request, current.State, review, context, cancellationToken);
+        }
+
         if (latestArtifact is not null &&
             string.Equals(latestArtifact.Type, ToolchainFeasibilityArtifactType, StringComparison.Ordinal) &&
             current.State.AcceptedVision is { } feasibilityVision)
@@ -404,12 +412,18 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                     return AgentCoordinationTurnResult.Blocked(
                         "The Producer acknowledgement must include the submitted exact planning package.");
                 var package = await context.Platform.Artifacts.GetPackageAsync(packageId, cancellationToken);
-                if (package.Version != packageVersion ||
-                    !package.Members.Any(member => member.ArtifactId == acknowledgement.HighLevelGddArtifactId &&
-                                                   member.AcceptedRevisionId == acknowledgement.HighLevelGddAcceptedRevisionId))
+                var confidentReview = request.Transcript.LastOrDefault(x => x.SpeakerOrganizationUserId == request.Counterpart.OrganizationUserId &&
+                    x.Artifact?.Type == CrosswiredStudios.VideoGame.PitchCollaboration.PitchProtocol.ReviewType)?.Artifact?.Payload
+                    .Deserialize<CrosswiredStudios.VideoGame.PitchCollaboration.PitchReview>(CrosswiredStudios.VideoGame.PitchCollaboration.PitchProtocol.Json);
+                var creativeReply = request.Transcript.LastOrDefault(x => x.SpeakerOrganizationUserId == request.Self.OrganizationUserId &&
+                    x.Artifact?.Type == CrosswiredStudios.VideoGame.PitchCollaboration.PitchProtocol.ReplyType)?.Artifact?.Payload
+                    .Deserialize<CrosswiredStudios.VideoGame.PitchCollaboration.PitchReply>(CrosswiredStudios.VideoGame.PitchCollaboration.PitchProtocol.Json);
+                if (package.Version != packageVersion || confidentReview is null || creativeReply is null ||
+                    !CrosswiredStudios.VideoGame.PitchCollaboration.PitchProtocol.Matches(confidentReview, creativeReply) ||
+                    !package.Members.Any(member => member.ArtifactId == confidentReview.DocumentId && member.AcceptedRevisionId == confidentReview.RevisionId))
                     return AgentCoordinationTurnResult.Blocked(
-                        "The submitted planning package does not bind the acknowledged high-level GDD revision.");
-                if (!string.Equals(package.Status, "Accepted", StringComparison.OrdinalIgnoreCase))
+                        "The planning package does not bind the exact jointly refined and accepted production brief.");
+                if (package.Status is not ("Accepted" or "Approved"))
                     _ = await context.Platform.Artifacts.DecidePackageAsync(package.Id,
                         $"creative-director-planning-package:{package.Id:N}:{package.Version}", cancellationToken);
                 var fingerprint = $"vision-handoff-acknowledged:{accepted.Digest}";
@@ -1476,16 +1490,17 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 HighLevelGddAcceptedRevisionId = state.HighLevelAcceptedRevisionId,
                 HighLevelGddRevisionSha256 = acceptedGddRevision.ContentSha256
             };
-            var artifact = new AgentCoordinationArtifactSubmission(
-                VisionBriefArtifactType, "1.0", acceptedVision.Digest, 1, true,
-                JsonSerializer.SerializeToElement(brief));
+            var artifact = CrosswiredStudios.VideoGame.PitchCollaboration.PitchProtocol.Artifact(
+                CrosswiredStudios.VideoGame.PitchCollaboration.PitchProtocol.BriefType, acceptedVision.Digest,
+                new CrosswiredStudios.VideoGame.PitchCollaboration.PitchBrief(brief,
+                    acceptedVision.ArtifactId, acceptedVision.ArtifactRevisionId, acceptedVision.ArtifactRevisionHash));
             var session = await context.Platform.Communication.StartCoordinationAsync(
                 new StartAgentCoordinationRequest(
                     producerEmployeeId,
-                    "Accepted video game vision handoff",
-                    "Acknowledge the exact accepted pitch digest and adopt it as the authoritative production charter.",
-                    ["Return video-game.production.game-vision-acknowledgement.v1", "Echo the exact digest", "List blockers, if any"],
-                    "Review the attached typed game-vision brief. Acknowledge the exact digest and begin backlog, dependency, staffing, and draft sprint planning while hiring continues.",
+                    "Refine the accepted game pitch and production brief",
+                    "Read the actual accepted pitch, ask and answer planning questions, and coauthor the production brief until the Producer is confident enough to propose staffing.",
+                    ["The Producer has no remaining planning questions", "The shared production brief is accepted by the Creative Director", "Return video-game.production.game-vision-acknowledgement.v1 only after convergence"],
+                    "Read the linked exact accepted pitch and high-level GDD. Draft the shared production brief, ask me focused questions, and incorporate my answers and edits. Do not propose staffing until you are confident and I accept the exact refined brief.",
                     acceptedVision.ConversationId,
                     acceptedVision.ChatTurnId,
                     acceptedVision.MessageId,

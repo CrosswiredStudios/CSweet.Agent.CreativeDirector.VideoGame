@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.5.1`
+- Version: `1.6.1`
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`
@@ -94,14 +94,14 @@ user/business memory, and supplied broker references. Explicit preferences and p
 may be proposed to governed memory immediately; inferred persona preferences are not persisted
 from a single observation and remain subject to platform approval.
 
-Built with `CSweet.Agent.SDK` 3.28.0, `CSweet.Memory` 0.1.2.
+Built with `CSweet.Agent.SDK` 3.31.0, `CSweet.Memory` 0.1.2.
 
 
 ## Extension ownership and isolated builds
 
 Game-specific payload helpers and decision logic live in the bundled `extensions/video-game` source snapshot under the publisher-owned `CrosswiredStudios.VideoGame` namespace. They are compiled into this agent, not published as C-Sweet platform contracts. The snapshot has versioned SHA-256 provenance and needs no sibling checkout or domain NuGet feed. C-Sweet handles generic coordination envelopes and profile metadata; agent permissions and existing wire type IDs remain unchanged.
 
-## Adaptive staffing (1.5.1 / production profile revision 4)
+## Adaptive staffing (1.6.1 / production profile revision 4)
 
 New projects bootstrap only the Producer. The accepted vision and project board are handed over while
 technical leadership, assets, toolchains and delivery hires are still being arranged. The Producer owns
@@ -113,3 +113,26 @@ Existing workstreams keep their pinned profile revision and are not silently mig
 Roster reads respect the platform limit of 100 entries per page. Bootstrap handoff requires
 the host roster fix allowing the active team lead's direct manager to inspect the team before
 Workstream creation, and including provided work capabilities in roster eligibility.
+
+## Pitch refinement before staffing
+
+The Creative Director supplies exact accepted pitch and GDD references. The Producer reads their
+contents and iterates a single shared production-brief document, asking focused questions while
+the Creative Director contributes answers and revised wording. The accepted pitch remains the
+scope authority; the working brief records delivery detail, assumptions and unresolved questions.
+Each turn and document revision is durable. Model decisions are cached per session/turn before
+document writes so retries retain the same decision. No staffing handoff is recorded until the
+Producer reports justified confidence with zero planning questions and the Creative Director
+accepts that exact revision. A stalled or bounded conversation never counts as readiness.
+The accepted brief includes immutable exact pitch/GDD source appendices and is packaged for technical planning.
+New coordination payloads are pitch-brief.v1, pitch-review.v1 and pitch-reply.v1 under
+video-game.production. Existing completed staffing decisions are not silently revoked.
+Reimport both agents to enable this protocol; legacy unrefined handoffs are blocked.
+
+## Shared collaboration SDK
+
+Uses CSweet.Agent.SDK 3.31.0 typed document references, explicit coordination read sharing,
+accepted-revision lookup, and handoff readiness checks. Pitch content and staffing judgment
+remain agent-specific. See the SDK's `docs/collaboration.md` for reusable documentation requests,
+clarification, review, and personal-work dependency waits. The matching C-Sweet host is required
+for sharing at every coordination start; package import alone does not update the host.
