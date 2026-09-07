@@ -28,7 +28,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.6.2";
+    public override string Version => "1.6.3";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -546,6 +546,19 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         CancellationToken cancellationToken)
     {
         await using var stream = context.CreateTurnStream(incoming.ConversationId, incoming.TurnId, incoming.Attempt);
+        if (!IsAuthoritativeManager(incoming, context.Identity))
+        {
+            var kickoffs = await FindProducerKickoffsAsync(incoming, context, cancellationToken);
+            if (kickoffs.Count > 0)
+            {
+                await stream.CommitAsync("Welcome. I am preparing our exact accepted pitch and GDD handoff. " +
+                    "We will refine and retain the shared production brief before you propose staffing. " +
+                    "Any project setup approval must complete before that scoped discussion begins.", cancellationToken);
+                foreach (var kickoff in kickoffs)
+                    await ReconcileAsync(incoming.MessageId, context, cancellationToken, kickoff.State, kickoff.Revision);
+                return;
+            }
+        }
         var current = await ReadStateAsync(context, cancellationToken,
             incoming.WorkContext?.WorkstreamId, conversationId);
         var state = current.State;

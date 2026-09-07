@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.6.2`
+- Version: `1.6.3`
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`
@@ -101,7 +101,7 @@ Built with `CSweet.Agent.SDK` 3.31.1, `CSweet.Memory` 0.1.2.
 
 Game-specific payload helpers and decision logic live in the bundled `extensions/video-game` source snapshot under the publisher-owned `CrosswiredStudios.VideoGame` namespace. They are compiled into this agent, not published as C-Sweet platform contracts. The snapshot has versioned SHA-256 provenance and needs no sibling checkout or domain NuGet feed. C-Sweet handles generic coordination envelopes and profile metadata; agent permissions and existing wire type IDs remain unchanged.
 
-## Adaptive staffing (1.6.2 / production profile revision 4)
+## Adaptive staffing (1.6.3 / production profile revision 4)
 
 New projects bootstrap only the Producer. The accepted vision and project board are handed over while
 technical leadership, assets, toolchains and delivery hires are still being arranged. The Producer owns
@@ -140,3 +140,11 @@ for sharing at every coordination start; package import alone does not update th
 ## Provider queue handling
 
 Uses SDK 3.31.1 for acknowledged LLM waiting, conversation activity, and host-authoritative deadline updates. Deploy the matching C-Sweet AgentHost and reimport this package to enable the private polling protocol.
+
+## Producer hiring kickoff
+
+A direct message from an active Producer on an approved project team resumes that project's
+setup and accepted-brief handoff, even before a Workstream exists. The Director resolves the
+sender from authenticated context and checks the governed team roster; message text cannot
+assign a role or approve the vision. The exact-document refinement workflow still controls
+creative acceptance and the Producer's subsequent staffing proposals.
