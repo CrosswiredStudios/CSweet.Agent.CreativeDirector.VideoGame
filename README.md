@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.6.3`
+- Version: `1.6.4`
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`
@@ -101,7 +101,7 @@ Built with `CSweet.Agent.SDK` 3.31.1, `CSweet.Memory` 0.1.2.
 
 Game-specific payload helpers and decision logic live in the bundled `extensions/video-game` source snapshot under the publisher-owned `CrosswiredStudios.VideoGame` namespace. They are compiled into this agent, not published as C-Sweet platform contracts. The snapshot has versioned SHA-256 provenance and needs no sibling checkout or domain NuGet feed. C-Sweet handles generic coordination envelopes and profile metadata; agent permissions and existing wire type IDs remain unchanged.
 
-## Adaptive staffing (1.6.3 / production profile revision 4)
+## Adaptive staffing (1.6.4 / production profile revision 4)
 
 New projects bootstrap only the Producer. The accepted vision and project board are handed over while
 technical leadership, assets, toolchains and delivery hires are still being arranged. The Producer owns

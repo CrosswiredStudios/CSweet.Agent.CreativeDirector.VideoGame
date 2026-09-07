@@ -28,7 +28,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.6.3";
+    public override string Version => "1.6.4";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -1890,7 +1890,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
             : VideoGameToolchainRecipeKeys.GodotNative2DGdscript;
     }
 
-    private async Task<(CreativeDirectorOperatingState State, long? Revision, bool Ready)> EnsureProjectFoundationAsync(
+    internal async Task<(CreativeDirectorOperatingState State, long? Revision, bool Ready)> EnsureProjectFoundationAsync(
         CreativeDirectorOperatingState state,
         long? revision,
         Guid? teamId,
@@ -2003,7 +2003,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
             {
                 WorkstreamId = state.WorkstreamId,
                 TeamId = state.TeamId,
-                Key = $"game-{state.WorkstreamId!.Value.ToString("N")[..12]}",
+                Key = $"VG{state.WorkstreamId!.Value:N}"[..12].ToUpperInvariant(),
                 ProfileKey = VideoGameProfileKeys.ProductionBoardV2
             }, cancellationToken);
             state = state with { BoardId = board.Id, Phase = CreativeDirectorPhase.ProjectSetup };
@@ -2011,8 +2011,10 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 $"project-board:{board.Id:N}", context, cancellationToken);
             state = saved.State;
             revision = saved.Revision;
-            await SeedProjectBoardAsync(state, producerId, context, cancellationToken);
+
         }
+        // Retry every seed using its stable idempotency key, including after the board ID was saved.
+        await SeedProjectBoardAsync(state, producerId, context, cancellationToken);
         return (state, revision, true);
     }
 
