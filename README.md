@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.6.1`
+- Version: `1.6.2`
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`
@@ -94,14 +94,14 @@ user/business memory, and supplied broker references. Explicit preferences and p
 may be proposed to governed memory immediately; inferred persona preferences are not persisted
 from a single observation and remain subject to platform approval.
 
-Built with `CSweet.Agent.SDK` 3.31.0, `CSweet.Memory` 0.1.2.
+Built with `CSweet.Agent.SDK` 3.31.1, `CSweet.Memory` 0.1.2.
 
 
 ## Extension ownership and isolated builds
 
 Game-specific payload helpers and decision logic live in the bundled `extensions/video-game` source snapshot under the publisher-owned `CrosswiredStudios.VideoGame` namespace. They are compiled into this agent, not published as C-Sweet platform contracts. The snapshot has versioned SHA-256 provenance and needs no sibling checkout or domain NuGet feed. C-Sweet handles generic coordination envelopes and profile metadata; agent permissions and existing wire type IDs remain unchanged.
 
-## Adaptive staffing (1.6.1 / production profile revision 4)
+## Adaptive staffing (1.6.2 / production profile revision 4)
 
 New projects bootstrap only the Producer. The accepted vision and project board are handed over while
 technical leadership, assets, toolchains and delivery hires are still being arranged. The Producer owns
@@ -131,8 +131,12 @@ Reimport both agents to enable this protocol; legacy unrefined handoffs are bloc
 
 ## Shared collaboration SDK
 
-Uses CSweet.Agent.SDK 3.31.0 typed document references, explicit coordination read sharing,
+Uses CSweet.Agent.SDK 3.31.1 typed document references, explicit coordination read sharing,
 accepted-revision lookup, and handoff readiness checks. Pitch content and staffing judgment
 remain agent-specific. See the SDK's `docs/collaboration.md` for reusable documentation requests,
 clarification, review, and personal-work dependency waits. The matching C-Sweet host is required
 for sharing at every coordination start; package import alone does not update the host.
+
+## Provider queue handling
+
+Uses SDK 3.31.1 for acknowledged LLM waiting, conversation activity, and host-authoritative deadline updates. Deploy the matching C-Sweet AgentHost and reimport this package to enable the private polling protocol.
