@@ -28,7 +28,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.5.0";
+    public override string Version => "1.5.1";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -1389,7 +1389,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         }
 
         var roster = (await context.Platform.ReadTeamRosterAsync(
-            new TeamRosterV2Request(approvedTeamId, null, 1, 200), cancellationToken)).Team;
+            new TeamRosterV2Request(approvedTeamId, null, 1, 100), cancellationToken)).Team;
         var requiredRoles = BuildRequiredStudioRoles(Guid.Parse(context.Identity?.EmployeeId!));
         var activeByRole = new Dictionary<string, AgentTeammate>(StringComparer.Ordinal);
         var assignedEmployees = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -1930,6 +1930,11 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
             };
             var saved = await SaveStateAsync(state, revision, reviewId,
                 $"workstream-proposed:{state.AcceptedVision.Digest}", context, cancellationToken);
+            await context.Platform.Communication.SendMessageAsync(state.AcceptedVision.ConversationId,
+                "The Producer is hired. Project setup is awaiting approval before I can attach the accepted brief and start production planning. " +
+                $"[Review project setup](/organizations/{context.BusinessId}/approvals). " +
+                "After approval, the Producer will propose staffing to me for review, and the Chief of Staff will bring you the approved hiring suggestions.",
+                $"workstream-approval-notice:{proposal.ApprovalId:N}", cancellationToken);
             return (saved.State, saved.Revision, false);
         }
 
@@ -2904,7 +2909,7 @@ public sealed class VideoGameCreativeDirectorAgent : CSweetAgentBase
         if (resource is null || resource.Status != "Pending") return;
 
         var roster = (await context.Platform.ReadTeamRosterAsync(
-            new TeamRosterV2Request(teamId, workstreamId, 1, 200), cancellationToken)).Team;
+            new TeamRosterV2Request(teamId, workstreamId, 1, 100), cancellationToken)).Team;
         var workstream = await context.Platform.ReadWorkstreamAsync(new ReadWorkstreamRequest(workstreamId), cancellationToken);
         string? revisionReason = null;
         if (roster is null || !Guid.TryParse(roster.LeadEmployeeId, out var teamLeadId) ||

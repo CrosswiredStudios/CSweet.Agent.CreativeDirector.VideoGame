@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.5.0`
+- Version: `1.5.1`
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`
@@ -101,7 +101,7 @@ Built with `CSweet.Agent.SDK` 3.28.0, `CSweet.Memory` 0.1.2.
 
 Game-specific payload helpers and decision logic live in the bundled `extensions/video-game` source snapshot under the publisher-owned `CrosswiredStudios.VideoGame` namespace. They are compiled into this agent, not published as C-Sweet platform contracts. The snapshot has versioned SHA-256 provenance and needs no sibling checkout or domain NuGet feed. C-Sweet handles generic coordination envelopes and profile metadata; agent permissions and existing wire type IDs remain unchanged.
 
-## Adaptive staffing (1.5.0 / production profile revision 4)
+## Adaptive staffing (1.5.1 / production profile revision 4)
 
 New projects bootstrap only the Producer. The accepted vision and project board are handed over while
 technical leadership, assets, toolchains and delivery hires are still being arranged. The Producer owns
@@ -109,3 +109,7 @@ workload-backed team proposals; the Creative Director reviews them against actua
 Revision 4 requires only the Producer at project level and the technical lead for detailed decomposition.
 QA readiness and independent release verification remain required; hiring approval never authorizes spending or launch.
 Existing workstreams keep their pinned profile revision and are not silently migrated or downsized.
+
+Roster reads respect the platform limit of 100 entries per page. Bootstrap handoff requires
+the host roster fix allowing the active team lead's direct manager to inspect the team before
+Workstream creation, and including provided work capabilities in roster eligibility.
