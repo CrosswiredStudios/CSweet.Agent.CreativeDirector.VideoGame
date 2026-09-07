@@ -9,7 +9,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "C-Sweet Video Game Creative Director",
-  "version": "1.6.4",
+  "version": "1.6.5",
   "publisher": { "id": "com.csweet", "name": "C-Sweet" },
   "runtime": {
     "type": "dotnet-project",
@@ -124,7 +124,6 @@
     { "name": "work.personal-todo.release.v1", "scope": "organization", "purpose": "Allow the SDK to release transient claims while preserving resumable Creative Director work." },
     { "name": "work.personal-todo.defer.v1", "scope": "organization", "purpose": "Allow the SDK to persist a bounded future review time and dependency reason for waiting Creative Director work." },
     { "name": "work.board.read", "scope": "organization", "purpose": "Inspect project-scoped boards and all accountable work." },
-    { "name": "work.board.create", "scope": "organization", "purpose": "Create the project board bound to the game Workstream and team." },
     { "name": "work.item.read", "scope": "organization", "purpose": "Inspect exact project tasks, assignments, blockers, and evidence links." },
     { "name": "work.item.create", "scope": "organization", "purpose": "Delegate profile-typed milestones, features, content, tasks, bugs, spikes, and reviews." },
     { "name": "work.item.comment", "scope": "organization", "purpose": "Leave auditable creative direction and review feedback on exact work items." },

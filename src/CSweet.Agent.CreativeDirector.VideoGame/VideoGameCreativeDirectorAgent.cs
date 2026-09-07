@@ -28,7 +28,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.6.4";
+    public override string Version => "1.6.5";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -234,6 +234,8 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (item.CorrelationId?.StartsWith(ProducerDocumentsPrefix, StringComparison.Ordinal) == true)
+            return await PrepareProducerDocumentationAsync(item, context, cancellationToken);
         if (CreativeDirectorAgenda.IsVision(item))
         {
             var current = await ReadStateForConversationAsync(
@@ -551,11 +553,9 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
             var kickoffs = await FindProducerKickoffsAsync(incoming, context, cancellationToken);
             if (kickoffs.Count > 0)
             {
-                await stream.CommitAsync("Welcome. I am preparing our exact accepted pitch and GDD handoff. " +
-                    "We will refine and retain the shared production brief before you propose staffing. " +
-                    "Any project setup approval must complete before that scoped discussion begins.", cancellationToken);
                 foreach (var kickoff in kickoffs)
-                    await ReconcileAsync(incoming.MessageId, context, cancellationToken, kickoff.State, kickoff.Revision);
+                    await QueueProducerDocumentationAsync(kickoff.State, context, cancellationToken);
+                await stream.CommitAsync("I created a personal task to prepare and share the accepted pitch and high-level GDD with you. If documentation is missing, I will reconstruct it from our saved project direction and obtain review. We will use the shared brief to resolve scope questions and prepare your hiring proposal before technical leadership builds the team board.", cancellationToken);
                 return;
             }
         }
@@ -1478,6 +1478,11 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 ? state.NotificationFingerprints.Append(teamMilestoneFingerprint).TakeLast(100).ToList()
                 : state.NotificationFingerprints
         };
+        if (!state.HighLevelArtifactId.HasValue || !state.HighLevelAcceptedRevisionId.HasValue)
+        {
+            await QueueProducerDocumentationAsync(state, context, cancellationToken);
+            return;
+        }
         var foundation = await EnsureProjectFoundationAsync(
             state, revision, approvedTeamId, producerEmployeeId, reviewId, context, cancellationToken);
         state = foundation.State;
@@ -1994,27 +1999,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
             revision = migrated.Revision;
         }
 
-        if (!state.BoardId.HasValue)
-        {
-            var board = await context.Platform.Work.CreateBoardAsync(new CreateWorkBoardRequest(
-                $"{state.WorkingTitle} Production",
-                "The inspectable source of truth for game milestones, features, content, tasks, bugs, research, and creative reviews.",
-                $"video-game-board:{state.WorkstreamId:N}")
-            {
-                WorkstreamId = state.WorkstreamId,
-                TeamId = state.TeamId,
-                Key = $"VG{state.WorkstreamId!.Value:N}"[..12].ToUpperInvariant(),
-                ProfileKey = VideoGameProfileKeys.ProductionBoardV2
-            }, cancellationToken);
-            state = state with { BoardId = board.Id, Phase = CreativeDirectorPhase.ProjectSetup };
-            var saved = await SaveStateAsync(state, revision, reviewId,
-                $"project-board:{board.Id:N}", context, cancellationToken);
-            state = saved.State;
-            revision = saved.Revision;
-
-        }
-        // Retry every seed using its stable idempotency key, including after the board ID was saved.
-        await SeedProjectBoardAsync(state, producerId, context, cancellationToken);
+        // Documentation and staffing discovery precede the Producer-owned team board.
         return (state, revision, true);
     }
 
@@ -2049,28 +2034,6 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
             [VideoGameArtifactTypeKeys.RunnableBuild, VideoGameArtifactTypeKeys.QualityEvaluationPlan],
             [VideoGameRoleKeys.Producer, VideoGameRoleKeys.QualityAssurance, VideoGameRoleKeys.TechnicalDirector])
     ];
-
-    private static async Task SeedProjectBoardAsync(
-        CreativeDirectorOperatingState state,
-        Guid producerId,
-        AgentRuntimeContext context,
-        CancellationToken cancellationToken)
-    {
-        if (!state.BoardId.HasValue || state.AcceptedVision is null) return;
-        foreach (var item in new[]
-                 {
-                     ("Establish the accepted vision and pre-production plan", "Bind all planning and documents to the exact accepted vision revision and hash."),
-                     ("Select and certify the autonomous toolchain", "Obtain Technical Director feasibility evidence and choose an eligible adapter with documented alternatives and tradeoffs."),
-                     ("Deliver and validate the playable prototype", "Produce a reproducible runnable build, validations, preview evidence, and a reported playtest before requesting the prototype gate.")
-                 })
-            _ = await context.Platform.Work.CreateItemAsync(new CreateWorkItemRequest(
-                state.BoardId.Value, item.Item1, item.Item2, WorkItemKinds.Epic, "High",
-                null, null, null, $"game-foundation:{state.WorkstreamId:N}:{Digest(item.Item1)}")
-            {
-                TypeKey = VideoGameWorkItemTypeKeys.Milestone,
-                AccountableOrganizationUserId = producerId
-            }, cancellationToken);
-    }
 
     private static string ExtractWorkingTitle(string markdown)
     {
@@ -2965,7 +2928,32 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 revisionReason = "Refresh the proposal with the current trusted flow-metrics source revision.";
         }
         else if (revisionReason is null)
-            revisionReason = "The requesting team has no authoritative workstream board.";
+        {
+            var projectState = await ReadStateByKeyAsync(ProjectStateKey(workstreamId, null), context, cancellationToken);
+            if (projectState.State.HandoffSessionId is not { } handoffSession)
+                revisionReason = "Complete the documented Producer handoff before proposing technical leadership.";
+            else
+            {
+                var session = await context.Platform.Communication.ReadCoordinationAsync(handoffSession, cancellationToken);
+                var approvedBrief = session.Turns.LastOrDefault(x => x.SpeakerOrganizationUserId == creativeDirectorId &&
+                    x.Artifact?.Type == CrosswiredStudios.VideoGame.PitchCollaboration.PitchProtocol.ReplyType)?.Artifact?.Payload
+                    .Deserialize<CrosswiredStudios.VideoGame.PitchCollaboration.PitchReply>(CrosswiredStudios.VideoGame.PitchCollaboration.PitchProtocol.Json);
+                var producerReview = session.Turns.LastOrDefault(x => x.SpeakerOrganizationUserId == resource.RequesterOrganizationUserId &&
+                    x.Artifact?.Type == CrosswiredStudios.VideoGame.PitchCollaboration.PitchProtocol.ReviewType)?.Artifact?.Payload
+                    .Deserialize<CrosswiredStudios.VideoGame.PitchCollaboration.PitchReview>(CrosswiredStudios.VideoGame.PitchCollaboration.PitchProtocol.Json);
+                revisionReason = producerReview?.PitchDigest != projectState.State.AcceptedVision?.Digest
+                    ? "The staffing brief must match this project's accepted pitch."
+                    : ValidateInitialTechnicalLeadership(resource, roster!, producerReview, approvedBrief);
+                if (revisionReason is null)
+                {
+                    var briefDocument = await context.Platform.Artifacts.GetAsync(approvedBrief!.DocumentId, cancellationToken);
+                    if (briefDocument.WorkstreamId != workstreamId || briefDocument.TeamId != teamId ||
+                        !briefDocument.Revisions.Any(x => x.Id == approvedBrief.RevisionId &&
+                            x.ContentSha256 == approvedBrief.RevisionSha256 && x.Status == "Accepted"))
+                        revisionReason = "The staffing evidence must identify the exact accepted project production brief.";
+                }
+            }
+        }
 
         if (revisionReason is null && metrics is not null)
         {
