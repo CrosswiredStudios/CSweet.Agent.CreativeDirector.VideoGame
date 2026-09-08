@@ -28,7 +28,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.6.5";
+    public override string Version => "1.6.6";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -177,6 +177,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         var decision = decisions.SingleOrDefault();
         if (decision is null || decision.Status != DecisionStatuses.Decided) return;
         var current = await ReadStateAsync(context, cancellationToken, decision.WorkstreamId);
+        await WakeProductionCommitmentAsync(current.State, decision.TypeKey, context, cancellationToken);
         var waiting = current.State.PendingEscalations.Where(x => x.DecisionId == decision.Id && !x.Relayed).ToList();
         if (waiting.Count == 0) return;
         foreach (var escalation in waiting.Where(x => x.RequestingEmployeeId != Guid.Empty))
@@ -236,6 +237,8 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         cancellationToken.ThrowIfCancellationRequested();
         if (item.CorrelationId?.StartsWith(ProducerDocumentsPrefix, StringComparison.Ordinal) == true)
             return await PrepareProducerDocumentationAsync(item, context, cancellationToken);
+        if (item.CorrelationId?.StartsWith(ProductionCommitmentPrefix, StringComparison.Ordinal) == true)
+            return await HandleProductionCommitmentAsync(item, context, cancellationToken);
         if (CreativeDirectorAgenda.IsVision(item))
         {
             var current = await ReadStateForConversationAsync(
@@ -1532,8 +1535,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         var handoffSaved = await SaveStateAsync(state, revision, reviewId,
             $"vision-handoff:{state.AcceptedVision!.Digest}", context, cancellationToken);
         // Planning starts with the accepted vision. Toolchain and asset decisions gate dependent work only.
-        await EnsureProjectDecisionsAndTechnicalReviewAsync(
-            handoffSaved.State, handoffSaved.Revision, reviewId, context, cancellationToken);
+        await QueueProductionCommitmentsAsync(handoffSaved.State, context, cancellationToken);
         if (isNewTeamMilestone && Guid.TryParse(context.Identity?.ManagerEmployeeId, out var superiorId))
             await context.Platform.Communication.SendDirectMessageAsync(
                 superiorId,
@@ -1601,8 +1603,8 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         return false;
     }
 
-    private async Task<(CreativeDirectorOperatingState State, long? Revision, bool Ready)>
-        EnsureProjectDecisionsAndTechnicalReviewAsync(
+    internal async Task<(CreativeDirectorOperatingState State, long? Revision, bool Ready)>
+        EnsureAssetStrategyAsync(
             CreativeDirectorOperatingState state,
             long? revision,
             Guid reviewId,
@@ -1688,7 +1690,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 workstreamId,
                 VideoGameDecisionTypeKeys.AssetStrategy,
                 $"Select the project asset-production strategy. Proposed configuration: {JsonSerializer.Serialize(strategy)}",
-                "routine-project-production-strategy",
+                ProductionStrategyAuthority,
                 [
                     new DecisionOption(VideoGameAssetProductionModes.Provided, "Provided assets", "Use only project-scoped attachments with hashes and declared rights."),
                     new DecisionOption(VideoGameAssetProductionModes.Procedural, "Procedural assets", "Author deterministic code-native geometry, shaders, tones, and generated files."),
@@ -1704,10 +1706,9 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 null,
                 $"asset-strategy:{workstreamId:N}:{acceptedVision.Digest}",
                 JsonSerializer.SerializeToElement(strategy)), cancellationToken);
-            decision = await context.Platform.DecideDecisionAsync(new DecideDecisionRequest(
-                decision.Id, decision.Revision, mode,
+            decision = await DecideProductionChoiceAsync(decision, mode,
                 $"Selected within the routine production authority envelope. Exact configuration: {JsonSerializer.Serialize(strategy)}",
-                $"asset-strategy-decide:{decision.Id:N}:{mode}"), cancellationToken);
+                $"asset-strategy-decide:{decision.Id:N}:{mode}", context, cancellationToken);
             state = state with
             {
                 AssetStrategyDecisionId = decision.Id,
@@ -1720,6 +1721,16 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
             revision = saved.Revision;
         }
 
+        return (state, revision, state.AssetStrategyDecisionId.HasValue);
+    }
+
+    private async Task<(CreativeDirectorOperatingState State, long? Revision, bool Ready)> EnsureToolchainDecisionAsync(
+        CreativeDirectorOperatingState state, long? revision, Guid reviewId,
+        AgentRuntimeContext context, CancellationToken cancellationToken)
+    {
+        if (!state.WorkstreamId.HasValue || state.AcceptedVision is null) return (state, revision, false);
+        var workstreamId = state.WorkstreamId.Value;
+        var acceptedVision = state.AcceptedVision;
         var recipe = DetermineRequiredRecipe(state);
         var targets = recipe.StartsWith("godot.", StringComparison.Ordinal)
             ? new[] { "windows-x64", "linux-x64" }
@@ -1851,7 +1862,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 workstreamId,
                 VideoGameDecisionTypeKeys.ToolchainSelection,
                 $"Select a certified provider installation for exact recipe `{recipe}` and targets `{string.Join(", ", targets)}`.",
-                "routine-certified-toolchain-selection",
+                CertifiedToolchainAuthority,
                 options,
                 recommendedOption,
                 feasibility.EvidenceResourceIds.Select(id => new EvidenceReference(
@@ -1860,10 +1871,9 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 "Build implementation remains blocked until one exact certified definition, provider installation, and runtime image are durably selected.",
                 null,
                 $"toolchain-selection:{workstreamId:N}:{recipe}:{recommendation.Definition.DefinitionDigest}"), cancellationToken);
-            decision = await context.Platform.DecideDecisionAsync(new DecideDecisionRequest(
-                decision.Id, decision.Revision, recommendedOption,
+            decision = await DecideProductionChoiceAsync(decision, recommendedOption,
                 $"Selected after exact Technical Director feasibility evidence. Recipe `{recipe}`, definition `{recommendation.Definition.DefinitionDigest}`, provider installation `{recommendation.Eligibility.ProviderInstallationId:D}`, environment image `{recommendation.Eligibility.EnvironmentImageDigest}`.",
-                $"toolchain-selection-decide:{decision.Id:N}:{recommendedOption}"), cancellationToken);
+                $"toolchain-selection-decide:{decision.Id:N}:{recommendedOption}", context, cancellationToken);
             var saved = await SaveStateAsync(state with
             {
                 ToolchainSelectionDecisionId = decision.Id,
@@ -1949,7 +1959,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
                     0.05m, 14,
                     typeof(VideoGameRoleKeys).GetFields().Where(x => x.IsLiteral).Select(x => (string)x.GetRawConstantValue()!).ToList(),
                     ["funding-exception", "material-strategy-change", "legal-commitment", "publication", "launch", "sunset"],
-                    ["creative-review", "work-planning", "routine-staffing", "build", "validation", "preview", "evaluation", "gate-submit"],
+                    ["creative-review", "work-planning", "routine-staffing", "build", "validation", "preview", "evaluation", "gate-submit", ProductionStrategyAuthority, CertifiedToolchainAuthority],
                     null),
                 BuildLifecycleMilestones(now),
                 [new EvidenceReference("artifact", state.AcceptedVision.ArtifactId,

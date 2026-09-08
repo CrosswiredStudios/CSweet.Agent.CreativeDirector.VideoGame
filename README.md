@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.6.5`
+- Version: `1.6.6`
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`
@@ -101,7 +101,7 @@ Built with `CSweet.Agent.SDK` 3.31.1, `CSweet.Memory` 0.1.2.
 
 Game-specific payload helpers and decision logic live in the bundled `extensions/video-game` source snapshot under the publisher-owned `CrosswiredStudios.VideoGame` namespace. They are compiled into this agent, not published as C-Sweet platform contracts. The snapshot has versioned SHA-256 provenance and needs no sibling checkout or domain NuGet feed. C-Sweet handles generic coordination envelopes and profile metadata; agent permissions and existing wire type IDs remain unchanged.
 
-## Adaptive staffing (1.6.5 / production profile revision 4)
+## Adaptive staffing (1.6.6 / production profile revision 4)
 
 New projects bootstrap only the Producer. The accepted vision and project board are handed over while
 technical leadership, assets, toolchains and delivery hires are still being arranged. The Producer owns
@@ -149,7 +149,7 @@ sender from authenticated context and checks the governed team roster; message t
 assign a role or approve the vision. The exact-document refinement workflow still controls
 creative acceptance and the Producer's subsequent staffing proposals.
 
-### Documentation before delivery planning (1.6.5)
+### Documentation before delivery planning (1.6.6)
 
 A Producer documentation request creates a personal Director task to retrieve and share the
 accepted pitch and high-level GDD. Missing saved documents are reconstructed from durable
@@ -157,3 +157,7 @@ project direction and submitted for exact-revision review. The scoped documentat
 no longer requires a team board, and the Director no longer requests board-create authority.
 The first Technical Director proposal is reviewed against the exact accepted shared brief;
 subsequent capacity changes retain their board/workload evidence requirements.
+
+### Independent production commitments (1.6.6)
+
+Asset strategy and toolchain feasibility run as separate durable personal tasks after the Producer handoff. Their blockers do not fail documentation handoff or the portfolio reconciliation pass. Periodic reconciliation creates each commitment idempotently without automatically requeueing blocked work. A resolved asset/toolchain decision wakes its matching commitment. Future project proposals explicitly request `routine-project-production-strategy` and `routine-certified-toolchain-selection`; both remain subject to project approval. Existing projects are not silently granted additional authority: the task identifies the pending decision that needs authorized resolution. Replayed decisions already resolved to the expected option are consumed without attempting another approval.
