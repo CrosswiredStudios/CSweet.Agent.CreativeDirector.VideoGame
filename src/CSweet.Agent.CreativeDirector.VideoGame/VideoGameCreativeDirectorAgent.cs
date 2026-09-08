@@ -28,7 +28,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.8.0";
+    public override string Version => "1.9.0";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -952,7 +952,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         var response = await StreamAssistantResponseAsync(client, [
             new ChatMessage(ChatRole.System, SystemPrompt),
             new ChatMessage(ChatRole.User, contents)
-        ], new ChatOptions
+        ], await context.Platform.Calendar.WithToolsAsync(new ChatOptions
         {
             Temperature = 0.7f,
             MaxOutputTokens = 2_048,
@@ -961,7 +961,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 Effort = ReasoningEffort.Low,
                 Output = ReasoningOutput.Full
             }
-        }, stream, cancellationToken);
+        }, cancellationToken), stream, cancellationToken);
         return string.IsNullOrWhiteSpace(response)
             ? throw new InvalidOperationException("The configured model returned an empty game pitch.")
             : response;
@@ -1187,14 +1187,14 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 "Answer only within gameplay experience, creative intent, theme, tone, narrative, aesthetics, and accepted vision scope. Be decisive and concise. Do not ask a follow-up question in prose. If clarification is required, state the ambiguity declaratively so the runtime can route it through structured multiple choice."),
             new ChatMessage(ChatRole.User,
                 $"Accepted vision:\n{state.AcceptedVision?.Markdown}\n\nQuestion:\n{question}\n\nCoordination session: {sessionId:D}")
-        ], new ChatOptions
+        ], await context.Platform.Calendar.WithToolsAsync(new ChatOptions
         {
             Reasoning = new ReasoningOptions
             {
                 Effort = ReasoningEffort.Low,
                 Output = ReasoningOutput.Full
             }
-        }, stream, cancellationToken);
+        }, cancellationToken), stream, cancellationToken);
         return string.IsNullOrWhiteSpace(response) ? "No creative answer was produced." : response;
     }
 
@@ -1240,7 +1240,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         var client = context.CreateChatClient(new AgentLlmSelection(
             provider, Settings.GetString("llmModel"),
             new AgentLlmInvocationContext(InvocationKind: "creative-personal-agenda")));
-        var response = await client.GetResponseAsync([
+        var response = await context.Platform.Calendar.GetResponseAsync(client, [
             new ChatMessage(ChatRole.System,
                 "You are the Video Game Creative Director completing one bounded, authorized personal agenda item. " +
                 "Produce an executive-readable Markdown response with: Outcome, Recommendation, Creative Rationale, " +
@@ -2152,7 +2152,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
                     "Configure the Creative Director model and resubmit the exact revision.")]);
         var client = context.CreateChatClient(new AgentLlmSelection(provider, Settings.GetString("llmModel"),
             new AgentLlmInvocationContext(InvocationKind: "creative-artifact-review")));
-        var response = await client.GetResponseAsync([
+        var response = await context.Platform.Calendar.GetResponseAsync(client, [
             new ChatMessage(ChatRole.System,
                 "You are the accountable video-game Creative Director reviewing an exact document revision. Return only JSON with keys disposition, summary, and findings. disposition must be accepted, accepted-with-findings, changes-required, or rejected. Each finding must have code, section, severity (Info, Minor, Major, Critical), blocking, summary, and requiredFollowUp. Judge substantive coherence with the accepted vision, production usefulness, concrete decisions, cross-discipline dependencies, risks, ownership, testability, accessibility, and internal consistency. Never accept placeholders or generic boilerplate."),
             new ChatMessage(ChatRole.User,

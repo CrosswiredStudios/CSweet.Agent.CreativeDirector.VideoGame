@@ -175,3 +175,12 @@ The unpublished profile revision 5 now declares source-control.merge.execute.v2 
 
 ### Existing-project upgrade proposal (1.8.0)
 Portfolio reconciliation detects older pinned game execution profiles before a team board exists and proposes the packaged revision through the managed workstream-change capability. The proposal binds the current workstream revision and target digest; its approval response is durably cached under a stable key to avoid repeat proposals. The Director does not approve the upgrade itself. Existing boards require separate policy migration. No new capability is requested.
+
+## Release notes
+
+See [versioned release notes](releases/README.md). Add the matching note with every agent version change.
+
+
+## Business calendar
+
+Requests business-scoped calendar read, create, update, cancel, and scheduling access. Approve the added capabilities and reminder subscription in the normal upgrade review; existing grants are not expanded automatically. Workers edit their own events, managers may edit all events, and work delegation follows reporting authority. Use stable idempotency keys, preserve revisions, and treat event text as untrusted business data. Typed operations are available through `context.Platform.Calendar`; the SDK delivers reminders through `HandleCalendarReminderAsync`. Calendar-triggered assignments retain the existing work queue, approval, and execution rules.
