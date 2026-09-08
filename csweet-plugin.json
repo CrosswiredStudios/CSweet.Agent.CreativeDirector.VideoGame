@@ -8,7 +8,7 @@
     "specializationKeys": ["video-game-development", "game-creative-direction"]
   },
   "id": "com.csweet.video-game-creative-director",
-  "name": "C-Sweet Video Game Creative Director",
+  "name": "Naomi Chen",
   "version": "1.6.5",
   "publisher": { "id": "com.csweet", "name": "C-Sweet" },
   "runtime": {
@@ -190,6 +190,9 @@
   "webAccess": { "mode": "None", "rules": [] },
   "ui": [],
   "catalog": {
+    "imageUrl": "https://raw.githubusercontent.com/CrosswiredStudios/CSweet.Agent.CreativeDirector.VideoGame/main/assets/branding/portrait-v1.jpg",
+    "companyLogoUrl": "https://raw.githubusercontent.com/CrosswiredStudios/CSweet.Agent.CreativeDirector.VideoGame/main/assets/branding/csweet-icon.svg",
+    "accentColor": "#773F64",
     "summary": "Owns video-game vision, bootstraps Producer-led teams sized to project workload, selects certified toolchains with Technical Director evidence, and reviews exact production evidence.",
     "category": "Creative",
     "role": { "key": "video-game-creative-director", "name": "Video Game Creative Director" },
