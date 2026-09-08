@@ -28,7 +28,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.6.6";
+    public override string Version => "1.6.7";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -225,6 +225,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         AgentRuntimeContext context,
         CancellationToken cancellationToken)
     {
+        await ReviewPendingStaffingAsync(context, cancellationToken);
         await ReconcilePortfolioAsync(review.ReviewId, context, cancellationToken);
         await EnsurePortfolioAgendaAsync(context, cancellationToken);
     }
@@ -2897,12 +2898,31 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         await stream.FlushAsync(cancellationToken);
     }
 
+    internal static async Task ReviewPendingStaffingAsync(AgentRuntimeContext context, CancellationToken token)
+    {
+        if (!Guid.TryParse(context.Identity?.EmployeeId, out var director)) return;
+        var pending = await context.Platform.ReadResourceChangesAsync(new ResourceChangeReadRequest(), token);
+        foreach (var request in pending.Requests.Where(x => x.Status == "Pending" &&
+                     x.ManagerOrganizationUserId == director && x.TeamId.HasValue && x.WorkstreamId.HasValue).Take(5))
+        {
+            var payload = JsonSerializer.SerializeToElement(new { requestId = request.Id,
+                managerOrganizationUserId = director, teamId = request.TeamId, workstreamId = request.WorkstreamId });
+            await DecideProducerCapacityRequestAsync(new AgentEventEnvelope(Guid.Empty, request.Id,
+                ManagementEvents.ResourceChangeRequested, payload, DateTimeOffset.UtcNow), context, token);
+        }
+    }
+    internal static bool CanReviewProducerCapacity(AgentTeamContext? roster, Guid directorId,
+        Guid requesterId, Guid installationId, Guid managerId) =>
+        roster is not null && Guid.TryParse(roster.LeadEmployeeId, out var leadId) &&
+        (leadId == requesterId || (leadId == directorId && managerId == directorId &&
+            roster.Members.Any(x => Guid.TryParse(x.EmployeeId, out var memberId) && memberId == requesterId &&
+                x.AgentInstallationId == installationId && x.DeclaredRoleKeys.Contains(VideoGameRoleKeys.Producer))));
     private static async Task DecideProducerCapacityRequestAsync(
         AgentEventEnvelope message,
         AgentRuntimeContext context,
         CancellationToken cancellationToken)
     {
-        var requested = message.Data.Deserialize<ResourceChangeDecisionEvent>();
+        var requested = message.Data.Deserialize<ResourceChangeDecisionEvent>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
         if (requested is null || !Guid.TryParse(context.Identity?.EmployeeId, out var creativeDirectorId) ||
             requested.ManagerOrganizationUserId != creativeDirectorId || requested.TeamId is not { } teamId ||
             requested.WorkstreamId is not { } workstreamId)
@@ -2915,9 +2935,9 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
             new TeamRosterV2Request(teamId, workstreamId, 1, 100), cancellationToken)).Team;
         var workstream = await context.Platform.ReadWorkstreamAsync(new ReadWorkstreamRequest(workstreamId), cancellationToken);
         string? revisionReason = null;
-        if (roster is null || !Guid.TryParse(roster.LeadEmployeeId, out var teamLeadId) ||
-            teamLeadId != resource.RequesterOrganizationUserId)
-            revisionReason = "The requester is not the authoritative lead of the requesting team.";
+        if (!CanReviewProducerCapacity(roster, creativeDirectorId, resource.RequesterOrganizationUserId,
+                resource.RequesterInstallationId, resource.ManagerOrganizationUserId))
+            revisionReason = "The requester must be the team lead or the assigned Producer submitting to the Creative Director who leads this team.";
         else if (resource.ExpectedTeamRevision != roster.Revision)
             revisionReason = "Refresh the proposal against the current team revision.";
         else if (resource.Evidence.Count == 0 || string.IsNullOrWhiteSpace(resource.ExpectedEffect) ||
