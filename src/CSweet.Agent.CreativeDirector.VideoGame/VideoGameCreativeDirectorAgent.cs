@@ -28,7 +28,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.6.7";
+    public override string Version => "1.8.0";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -2385,6 +2385,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         if (workstreamId.HasValue)
         {
             var selected = await ReadStateAsync(context, cancellationToken, workstreamId);
+            await ProposeExecutionProfileUpgradeAsync(selected.State.WorkstreamId, context, cancellationToken);
             await ReconcileAsync(reviewId, context, cancellationToken, selected.State, selected.Revision);
             return;
         }
@@ -2393,6 +2394,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         foreach (var entry in index.Projects.OrderBy(x => x.UpdatedAt))
         {
             var current = await ReadStateByKeyAsync(entry.StateKey, context, cancellationToken);
+            await ProposeExecutionProfileUpgradeAsync(current.State.WorkstreamId, context, cancellationToken);
             await ReconcileAsync(reviewId, context, cancellationToken, current.State, current.Revision);
         }
     }

@@ -44,7 +44,7 @@ public sealed class ManifestTests
         Assert.Contains(WorkstreamEventNames.ArtifactPackageDecidedV1, manifest.Events.Subscribes);
         var profile = Assert.Single(manifest.WorkstreamProfiles.Provides);
         Assert.Equal("video-game-production.v2", profile.Key);
-        Assert.Equal(4, profile.Version);
+        Assert.Equal(5, profile.Version);
         Assert.True(File.Exists(Path.Combine(root,
             profile.DefinitionResource.Replace('/', Path.DirectorySeparatorChar))));
         Assert.Empty(manifest.Credentials);
@@ -58,7 +58,7 @@ public sealed class ManifestTests
     public async Task ProductionProfileOwnsLifecycleBoardTypesGatesAndStaffingDeclaratively()
     {
         using var profile = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(
-            Path.Combine(RepositoryRoot(), "profiles", "video-game-production.v2.4.json")));
+            Path.Combine(RepositoryRoot(), "profiles", "video-game-production.v2.5.json")));
         var root = profile.RootElement;
 
         Assert.Equal("video-game-production.v2", root.GetProperty("key").GetString());
@@ -90,6 +90,37 @@ public sealed class ManifestTests
             x.Name.Contains("marketplace", StringComparison.OrdinalIgnoreCase) ||
             x.Name.Contains("hiring.workflow", StringComparison.OrdinalIgnoreCase) ||
             x.Name.Contains("budget", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task CodeDeliveryRequiresReviewQualityAndGovernedMergeBeforeAcceptance()
+    {
+        using var profile = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(
+            Path.Combine(RepositoryRoot(), "profiles", "video-game-production.v2.5.json")));
+        var orchestration = profile.RootElement.GetProperty("orchestration");
+        var transitions = orchestration.GetProperty("transitions").EnumerateArray().ToArray();
+        string Next(string stage, string outcome) => Assert.Single(transitions, t =>
+            t.GetProperty("fromStageKey").GetString() == stage && t.GetProperty("outcomeCode").GetString() == outcome)
+            .GetProperty("toStageKey").GetString()!;
+        var current = Next("specialist-execution", "code-published");
+        Assert.Equal("technical-review", current);
+        current = Next(current, "approved"); Assert.Equal("quality", current);
+        current = Next(current, "passed"); Assert.Equal("merge-decision", current);
+        current = Next(current, "approved"); Assert.Equal("governed-merge", current);
+        current = Next(current, "merged"); Assert.Equal("producer-review", current);
+        Assert.Equal("done", Next(current, "approved"));
+        Assert.Equal("producer-review", Next("specialist-execution", "completed"));
+        foreach (var stage in new[] { "technical-review", "quality", "merge-decision" })
+        {
+            var retry = Assert.Single(transitions, t => t.GetProperty("fromStageKey").GetString() == stage &&
+                t.GetProperty("outcomeCode").GetString() == (stage == "quality" ? "failed" : "rejected"));
+            Assert.Equal("specialist-execution", retry.GetProperty("toStageKey").GetString());
+            Assert.Equal(3, retry.GetProperty("maximumTraversals").GetInt32());
+        }
+        var merge = Assert.Single(orchestration.GetProperty("stages").EnumerateArray(),
+            t => t.GetProperty("key").GetString() == "governed-merge");
+        Assert.Equal("TrustedPlatformAction", merge.GetProperty("stageType").GetString());
+        Assert.Equal("source-control.merge.execute.v2", merge.GetProperty("platformAction").GetString());
     }
 
     private static string RepositoryRoot()

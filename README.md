@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.6.7`
+- Version: `1.8.0`
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`
@@ -165,3 +165,13 @@ Asset strategy and toolchain feasibility run as separate durable personal tasks 
 ### Staffing approval recovery (1.6.7)
 
 The Director reads the host's camel-case resource-change events and reviews staffing proposals from the assigned Producer when the Director leads the team. Existing accepted-brief and staffing-evidence checks still apply. Attention reviews recover pending project staffing requests addressed to the Director, including requests whose notification was previously acknowledged without a decision. This requires no additional capability grant.
+
+### Code delivery workflow (1.7.0 / profile revision 5)
+
+New profile revision 5 distinguishes code-published from document completion. Code flows through technical review, independent QA, final exact-SHA merge authorization and trusted governed merge before Producer acceptance. Rejections return to implementation with a three-traversal limit. Existing revision 4 definitions remain unchanged; existing boards require a governed profile upgrade. This definition requires compatible Engineer, QA, Technical Director and Producer assignments; updating this package alone does not activate the complete delivery path.
+
+### Host policy compatibility (1.7.1)
+The unpublished profile revision 5 now declares source-control.merge.execute.v2 on its trusted merge stage and omits the unreachable cancellation node. Host policy validation is covered by the matching C-Sweet fixture. No published revision 4 definition was changed.
+
+### Existing-project upgrade proposal (1.8.0)
+Portfolio reconciliation detects older pinned game execution profiles before a team board exists and proposes the packaged revision through the managed workstream-change capability. The proposal binds the current workstream revision and target digest; its approval response is durably cached under a stable key to avoid repeat proposals. The Director does not approve the upgrade itself. Existing boards require separate policy migration. No new capability is requested.

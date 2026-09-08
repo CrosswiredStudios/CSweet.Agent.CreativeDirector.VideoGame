@@ -9,7 +9,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "Naomi Chen",
-  "version": "1.6.7",
+  "version": "1.8.0",
   "publisher": { "id": "com.csweet", "name": "C-Sweet" },
   "runtime": {
     "type": "dotnet-project",
@@ -25,8 +25,8 @@
     "provides": [
       {
         "key": "video-game-production.v2",
-        "version": 4,
-        "definitionResource": "profiles/video-game-production.v2.4.json"
+        "version": 5,
+        "definitionResource": "profiles/video-game-production.v2.5.json"
       }
     ],
     "requires": []
