@@ -16,6 +16,8 @@ public sealed class ManifestTests
 
         Assert.Equal(agent.AgentId, manifest.Id);
         Assert.Equal(agent.Version, manifest.Version);
+        Assert.Contains(manifest.Requires, x => x.Name == "work.board.read" && x.Scope == "team");
+        Assert.Contains(manifest.Requires, x => x.Name == "work.item.read" && x.Scope == "team");
         Assert.Contains(VideoGameCreativeDirectorAgent.GameVisionCapability, manifest.Capabilities);
         Assert.NotNull(manifest.RolePolicy);
         Assert.Equal("manager.v1", manifest.RolePolicy!.Profile);

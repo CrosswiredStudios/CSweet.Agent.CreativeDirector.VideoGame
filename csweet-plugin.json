@@ -14,7 +14,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "Naomi Chen",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "publisher": {
     "id": "com.csweet",
     "name": "C-Sweet"
@@ -391,12 +391,12 @@
     },
     {
       "name": "work.board.read",
-      "scope": "organization",
+      "scope": "team",
       "purpose": "Inspect project-scoped boards and all accountable work."
     },
     {
       "name": "work.item.read",
-      "scope": "organization",
+      "scope": "team",
       "purpose": "Inspect exact project tasks, assignments, blockers, and evidence links."
     },
     {
