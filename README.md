@@ -94,7 +94,7 @@ user/business memory, and supplied broker references. Explicit preferences and p
 may be proposed to governed memory immediately; inferred persona preferences are not persisted
 from a single observation and remain subject to platform approval.
 
-Built with `CSweet.Agent.SDK` 3.31.1, `CSweet.Memory` 0.1.2.
+Built with `CSweet.Agent.SDK` 3.40.0, `CSweet.Memory` 0.1.2.
 
 
 ## Extension ownership and isolated builds
@@ -131,7 +131,7 @@ Reimport both agents to enable this protocol; legacy unrefined handoffs are bloc
 
 ## Shared collaboration SDK
 
-Uses CSweet.Agent.SDK 3.31.1 typed document references, explicit coordination read sharing,
+Uses CSweet.Agent.SDK 3.40.0 typed document references, explicit coordination read sharing,
 accepted-revision lookup, and handoff readiness checks. Pitch content and staffing judgment
 remain agent-specific. See the SDK's `docs/collaboration.md` for reusable documentation requests,
 clarification, review, and personal-work dependency waits. The matching C-Sweet host is required
@@ -139,7 +139,7 @@ for sharing at every coordination start; package import alone does not update th
 
 ## Provider queue handling
 
-Uses SDK 3.31.1 for acknowledged LLM waiting, conversation activity, and host-authoritative deadline updates. Deploy the matching C-Sweet AgentHost and reimport this package to enable the private polling protocol.
+Uses SDK 3.40.0 for acknowledged LLM waiting, conversation activity, and host-authoritative deadline updates. Deploy the matching C-Sweet AgentHost and reimport this package to enable the private polling protocol.
 
 ## Producer hiring kickoff
 
