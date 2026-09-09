@@ -28,7 +28,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.9.1";
+    public override string Version => "1.9.2";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -59,6 +59,18 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
 
         if (string.Equals(message.EventType, AgentCoordinationEvents.TurnRequested, StringComparison.Ordinal))
             return;
+
+        if (string.Equals(message.EventType, WorkstreamEventNames.DecisionRequestedV1, StringComparison.Ordinal))
+        {
+            var resource = DeserializePayload<GenericResourceEvent>(message.Data);
+            if (resource is not null)
+            {
+                var decisions = await context.Platform.ReadDecisionsAsync(new ReadDecisionRequest(resource.AggregateId), cancellationToken);
+                foreach (var decision in decisions)
+                    await RelayPlanningDecisionAsync(decision, context, cancellationToken);
+            }
+            return;
+        }
 
         if (string.Equals(message.EventType, WorkstreamEventNames.DecisionDecidedV1, StringComparison.Ordinal))
         {
@@ -552,6 +564,19 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         CancellationToken cancellationToken)
     {
         await using var stream = context.CreateTurnStream(incoming.ConversationId, incoming.TurnId, incoming.Attempt);
+        if (incoming.WorkContext?.WorkstreamId is { } notificationWorkstream &&
+            PlanningDecisionNotificationId(ExtractCurrentMessage(incoming.Message)) is { } notificationId)
+        {
+            var decisions = await context.Platform.ReadDecisionsAsync(new ReadDecisionRequest(notificationId), cancellationToken);
+            var decision = decisions.SingleOrDefault(x => x.WorkstreamId == notificationWorkstream &&
+                x.TypeKey == "video-game.management-direction.v1");
+            if (decision is not null)
+            {
+                await RelayPlanningDecisionAsync(decision, context, cancellationToken);
+                await stream.CommitAsync("The planning decision is recorded for authoritative management review. This notification does not change or accept the game vision.", cancellationToken);
+                return;
+            }
+        }
         if (!IsAuthoritativeManager(incoming, context.Identity))
         {
             var kickoffs = await FindProducerKickoffsAsync(incoming, context, cancellationToken);
@@ -1366,6 +1391,13 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         var state = current.Item1;
         var revision = current.Item2;
         if (state.AcceptedVision is null) return;
+        if (state.WorkstreamId is { } decisionWorkstreamId)
+        {
+            var pending = await context.Platform.ReadDecisionsAsync(
+                new ReadDecisionRequest(WorkstreamId: decisionWorkstreamId, PendingOnly: true), cancellationToken);
+            foreach (var decision in pending)
+                await RelayPlanningDecisionAsync(decision, context, cancellationToken);
+        }
         var acceptedVision = state.AcceptedVision;
         if (state.DetailedDesignPackageId.HasValue)
         {
