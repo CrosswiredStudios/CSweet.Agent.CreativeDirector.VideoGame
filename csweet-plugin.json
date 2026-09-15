@@ -14,7 +14,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "Naomi Chen",
-  "version": "1.9.2",
+  "version": "1.10.0",
   "publisher": {
     "id": "com.csweet",
     "name": "C-Sweet"
@@ -408,6 +408,16 @@
       "name": "work.item.comment",
       "scope": "organization",
       "purpose": "Leave auditable creative direction and review feedback on exact work items."
+    },
+    {
+      "name": "work.item.comment.update.v1",
+      "scope": "organization",
+      "purpose": "Correct this agent's own creative-direction comment on an exact work item."
+    },
+    {
+      "name": "work.item.comment.delete.v1",
+      "scope": "organization",
+      "purpose": "Retract this agent's own creative-direction comment while its activity history is retained."
     },
     {
       "name": "work.sprint.read",
