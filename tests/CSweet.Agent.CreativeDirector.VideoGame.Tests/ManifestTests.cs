@@ -17,6 +17,13 @@ public sealed class ManifestTests
         Assert.Equal(agent.AgentId, manifest.Id);
         Assert.Equal(agent.Version, manifest.Version);
         Assert.Equal(agent.Version, typeof(VideoGameCreativeDirectorAgent).Assembly.GetName().Version?.ToString(3));
+        var contextWindow = Assert.Single(manifest.Configuration,
+            field => field.Key == "maxContextWindowTokens");
+        var outputTokens = Assert.Single(manifest.Configuration,
+            field => field.Key == "maxOutputTokens");
+        Assert.Equal(220_000, contextWindow.DefaultValue!.Value.GetInt32());
+        Assert.Equal(32_000, outputTokens.DefaultValue!.Value.GetInt32());
+        Assert.Equal("maxContextWindowTokens", outputTokens.LessThanFieldKey);
         Assert.Contains(manifest.Requires, x => x.Name == "work.board.read" && x.Scope == "team");
         Assert.Contains(manifest.Requires, x => x.Name == "work.item.read" && x.Scope == "team");
         Assert.Contains(VideoGameCreativeDirectorAgent.GameVisionCapability, manifest.Capabilities);

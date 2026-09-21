@@ -14,7 +14,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "Naomi Chen",
-  "version": "1.10.1",
+  "version": "1.11.0",
   "publisher": {
     "id": "com.csweet",
     "name": "C-Sweet"
@@ -560,6 +560,31 @@
       "secret": false,
       "description": "A multimodal-capable model is recommended.",
       "dependsOnFieldKey": "llmProviderId"
+    },
+    {
+      "key": "maxContextWindowTokens",
+      "type": "number",
+      "label": "Maximum context-window tokens",
+      "required": true,
+      "secret": false,
+      "description": "Planning ceiling for high-level game vision generation; set this no higher than the selected model's real context window.",
+      "minimum": 32769,
+      "maximum": 2000000,
+      "step": 1000,
+      "defaultValue": 220000
+    },
+    {
+      "key": "maxOutputTokens",
+      "type": "number",
+      "label": "Maximum pitch output tokens",
+      "required": true,
+      "secret": false,
+      "description": "Budget for one high-level game vision response, including model reasoning. The provider may impose a lower ceiling.",
+      "minimum": 2048,
+      "maximum": 32768,
+      "step": 1000,
+      "defaultValue": 32000,
+      "lessThanFieldKey": "maxContextWindowTokens"
     }
   ],
   "credentials": [],

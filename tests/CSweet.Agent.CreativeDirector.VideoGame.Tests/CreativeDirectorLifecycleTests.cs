@@ -217,6 +217,25 @@ public sealed class CreativeDirectorLifecycleTests
             new OperationCanceledException(cancelled.Token), cancelled.Token));
     }
 
+    [Fact]
+    public void PitchOutputBudgetUsesConfiguredValueAndStaysBelowContextWindow()
+    {
+        Assert.Equal(32_000, VideoGameCreativeDirectorAgent.ResolvePitchOutputTokens(
+            new AgentSettings(new Dictionary<string, JsonElement>())));
+        Assert.Equal(32_768, VideoGameCreativeDirectorAgent.ResolvePitchOutputTokens(
+            new AgentSettings(new Dictionary<string, JsonElement>
+            {
+                ["maxContextWindowTokens"] = JsonSerializer.SerializeToElement(220_000),
+                ["maxOutputTokens"] = JsonSerializer.SerializeToElement(32_768)
+            })));
+        Assert.Equal(24_999, VideoGameCreativeDirectorAgent.ResolvePitchOutputTokens(
+            new AgentSettings(new Dictionary<string, JsonElement>
+            {
+                ["maxContextWindowTokens"] = JsonSerializer.SerializeToElement(25_000),
+                ["maxOutputTokens"] = JsonSerializer.SerializeToElement(32_000)
+            })));
+    }
+
     [Theory]
     [InlineData(ManagerInvolvementMode.Delegated, "LockAndStaff")]
     [InlineData(ManagerInvolvementMode.MilestoneReview, "AwaitExplicitMilestoneApproval")]

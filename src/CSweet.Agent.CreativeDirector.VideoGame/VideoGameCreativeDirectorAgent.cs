@@ -20,6 +20,10 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
     public const string VisionAcknowledgementArtifactType = "video-game.production.game-vision-acknowledgement.v1";
     public const string ToolchainFeasibilityArtifactType = "video-game.toolchain-feasibility.v1";
     private const string StateSchema = "com.csweet.video-game-creative-director.operating-state.v1";
+    internal const int DefaultPitchContextWindowTokens = 220_000;
+    internal const int DefaultPitchOutputTokens = 32_000;
+    internal const int MinimumPitchOutputTokens = 2_048;
+    internal const int MaximumPitchOutputTokens = 32_768;
     private static readonly IReadOnlyList<AskUserOption> InvolvementOptions =
     [
         new("delegated", "Delegate decisions", "I decide every unspecified creative choice and lock the initial vision."),
@@ -28,13 +32,22 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.10.1";
+    public override string Version => "1.11.0";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
             description: "The brokered model used to create and refine game pitches.")
         .LlmModel("llmModel", "Model", "llmProviderId", required: true,
-            description: "A multimodal-capable model is recommended for concept art and PDF references.");
+            description: "A multimodal-capable model is recommended for concept art and PDF references.")
+        .Number("maxContextWindowTokens", "Maximum context-window tokens", required: true,
+            description: "Planning ceiling for high-level game vision generation; set this no higher than the selected model's real context window.",
+            minimum: 32_769, maximum: 2_000_000, step: 1_000,
+            defaultValue: DefaultPitchContextWindowTokens)
+        .Number("maxOutputTokens", "Maximum pitch output tokens", required: true,
+            description: "Budget for one high-level game vision response, including model reasoning. The provider may impose a lower ceiling.",
+            minimum: MinimumPitchOutputTokens, maximum: MaximumPitchOutputTokens, step: 1_000,
+            defaultValue: DefaultPitchOutputTokens,
+            lessThanFieldKey: "maxContextWindowTokens");
 
     public override async Task HandleEventAsync(
         AgentEventEnvelope message,
@@ -834,7 +847,9 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 IsRecoverablePitchGenerationFailure(exception, cancellationToken))
             {
                 await stream.CommitAsync(
-                    $"Your game direction and {DescribeInvolvementMode(state.ManagerPreferences.InvolvementMode)} involvement preference are saved, but the configured model timed out or was unavailable while generating the high-level vision. Retry this direction after checking the Creative Director's LLM provider; you do not need to re-enter it.",
+                    exception is InvalidOperationException { Message: "The configured model returned an empty game pitch." }
+                        ? $"Your game direction and {DescribeInvolvementMode(state.ManagerPreferences.InvolvementMode)} involvement preference are saved, but the model returned no pitch text. Its output budget may have been spent on reasoning. Check Maximum pitch output tokens and the provider's ceiling, then retry; you do not need to re-enter your direction."
+                        : $"Your game direction and {DescribeInvolvementMode(state.ManagerPreferences.InvolvementMode)} involvement preference are saved, but the configured model timed out or was unavailable while generating the high-level vision. Retry this direction after checking the Creative Director's LLM provider; you do not need to re-enter it.",
                     cancellationToken);
                 return;
             }
@@ -953,6 +968,15 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
             }, cancellationToken);
     }
 
+    internal static int ResolvePitchOutputTokens(AgentSettings settings)
+    {
+        var contextWindow = Math.Max(settings.GetInt32("maxContextWindowTokens", DefaultPitchContextWindowTokens),
+            MinimumPitchOutputTokens + 1);
+        var output = Math.Clamp(settings.GetInt32("maxOutputTokens", DefaultPitchOutputTokens),
+            MinimumPitchOutputTokens, MaximumPitchOutputTokens);
+        return Math.Min(output, contextWindow - 1);
+    }
+
     private async Task<string> GeneratePitchAsync(
         CommunicationMessageReceivedEvent incoming,
         string currentMessage,
@@ -980,7 +1004,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         ], await context.Platform.Calendar.WithToolsAsync(new ChatOptions
         {
             Temperature = 0.7f,
-            MaxOutputTokens = 2_048,
+            MaxOutputTokens = ResolvePitchOutputTokens(Settings),
             Reasoning = new ReasoningOptions
             {
                 Effort = ReasoningEffort.Low,

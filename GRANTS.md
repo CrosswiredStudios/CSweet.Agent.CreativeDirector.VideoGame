@@ -1,6 +1,6 @@
 # Video Game Creative Director grants
 
-The reviewed authority source is `csweet-plugin.json` for agent version `1.10.1`.
+The reviewed authority source is `csweet-plugin.json` for agent version `1.11.0`.
 
 - Business, finance, organization, roster, and approved memory reads ground creative decisions.
 - User-memory proposals are limited to explicit interaction, involvement, story-participation, and approval preferences.
