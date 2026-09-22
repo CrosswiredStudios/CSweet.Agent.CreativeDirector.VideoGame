@@ -7,6 +7,41 @@ namespace CSweet.Agent.CreativeDirector.VideoGame.Tests;
 public sealed class ProductionCommitmentTests
 {
     [Fact]
+    public async Task ManagerRecordsAnEvidenceRequestWhenAcceptedPlanningEvidenceIsMissing()
+    {
+        var workstream = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var decision = new DecisionRecord(Guid.NewGuid(), workstream,
+            "video-game.management-direction.v1", "Choose browser targets", "work-planning",
+            [new DecisionOption("request-more-evidence", "More evidence", null)],
+            "request-more-evidence", null, DecisionStatuses.Pending, null, [], null, null,
+            null, 1, now, now);
+        DecideDecisionRequest? submitted = null;
+        var runtime = new AgentTestRuntime()
+            .RegisterCapability<DecideDecisionRequest, DecisionRecord>(PlatformCapabilities.DecisionDecide,
+                (request, _) => { submitted = request; return Task.FromResult(decision); });
+        await new VideoGameCreativeDirectorAgent().DecideProducerPlanningAsync(decision,
+            new CreativeDirectorOperatingState { WorkstreamId = workstream }, runtime.CreateContext(), default);
+        Assert.NotNull(submitted);
+        Assert.Equal(decision.Id, submitted.DecisionId);
+        Assert.Equal("request-more-evidence", submitted.SelectedOptionId);
+    }
+
+    [Fact]
+    public void PlanningDirectionMustChooseAnAuthorizedOptionWithRationale()
+    {
+        DecisionOption[] options = [new("continue-current-plan", "Continue", null),
+            new("request-more-evidence", "More evidence", null)];
+        var direction = VideoGameCreativeDirectorAgent.ParsePlanningDirection(
+            """{"optionId":"continue-current-plan","rationale":"The accepted brief already sets this scope.","requiresOwner":false}""", options);
+        Assert.Equal("continue-current-plan", direction.OptionId);
+        Assert.Throws<InvalidOperationException>(() => VideoGameCreativeDirectorAgent.ParsePlanningDirection(
+            """{"optionId":"invented","rationale":"Go ahead.","requiresOwner":false}""", options));
+        Assert.Throws<InvalidOperationException>(() => VideoGameCreativeDirectorAgent.ParsePlanningDirection(
+            """{"optionId":"continue-current-plan","rationale":" ","requiresOwner":false}""", options));
+    }
+
+    [Fact]
     public void ProductionQuestionsAreHumanReadableAndDistinguishAssetsFromBuildCapacity()
     {
         var assets = VideoGameCreativeDirectorAgent.BuildAssetStrategyQuestion();
