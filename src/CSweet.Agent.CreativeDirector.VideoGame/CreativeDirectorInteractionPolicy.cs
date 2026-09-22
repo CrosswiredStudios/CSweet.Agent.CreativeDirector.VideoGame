@@ -87,6 +87,16 @@ internal static class CreativeDirectorAgenda
     internal static bool IsProjectReview(PersonalTodoItem item) =>
         item.CorrelationId?.StartsWith($"{ProjectReviewKind}:", StringComparison.Ordinal) == true;
 
+    internal static Guid? ProjectReviewConversationId(PersonalTodoItem item)
+    {
+        if (!IsProjectReview(item)) return null;
+        var suffix = item.CorrelationId![(ProjectReviewKind.Length + 1)..];
+        if (!Guid.TryParseExact(suffix, "N", out var conversationId) ||
+            item.SourceConversationId.HasValue && item.SourceConversationId != conversationId)
+            return null;
+        return conversationId;
+    }
+
     internal static TimeSpan ProjectReviewCadence(CreativeDirectorPhase phase) =>
         phase == CreativeDirectorPhase.Oversight ? TimeSpan.FromDays(1) : TimeSpan.FromHours(4);
 

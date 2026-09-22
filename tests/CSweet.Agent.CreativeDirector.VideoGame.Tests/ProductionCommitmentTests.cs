@@ -44,6 +44,7 @@ public sealed class ProductionCommitmentTests
             state.TeamId, Guid.NewGuid(), Guid.NewGuid(), context, default));
         await Assert.ThrowsAnyAsync<Exception>(() => agent.EnsureAssetStrategyAsync(state, 1, Guid.NewGuid(), context, default));
         Assert.NotNull(plan); Assert.NotNull(decision);
+        Assert.Equal(5, plan.ProfileVersion);
         Assert.Contains(decision.AuthorityRuleKey, plan.AuthorityEnvelope.AgentAuthorizedActionKeys);
         Assert.Contains(VideoGameCreativeDirectorAgent.CertifiedToolchainAuthority, plan.AuthorityEnvelope.AgentAuthorizedActionKeys);
         Assert.Contains("launch", plan.AuthorityEnvelope.HumanRequiredActionKeys);

@@ -163,6 +163,8 @@ public sealed class CreativeDirectorInteractionTests
                 state.Phase, DateTimeOffset.UtcNow)]
         };
         AddPersonalTodoItemRequest? captured = null;
+        PersonalTodoItem? legacyCard = null;
+        var requeued = 0;
         var runtime = new AgentTestRuntime()
             .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(
                 PlatformCapabilities.AgentOperatingStateRead,
@@ -177,8 +179,24 @@ public sealed class CreativeDirectorInteractionTests
                 (request, _) =>
                 {
                     captured = request;
-                    return Task.FromResult(PersonalItem(
-                        request.Title, request.CorrelationId!, conversationId));
+                    legacyCard = PersonalItem(request.Title, request.CorrelationId!, conversationId) with
+                    {
+                        Status = PersonalTodoStatuses.Blocked,
+                        SourceConversationId = null,
+                        BlockReason = "A portfolio review requires its source project conversation."
+                    };
+                    return Task.FromResult(legacyCard);
+                })
+            .RegisterCapability<JsonElement, PersonalTodoDirectory>(PersonalTodoCapabilities.Read,
+                (_, _) => Task.FromResult(new PersonalTodoDirectory(
+                    [new PersonalTodoBoard(legacyCard!.BoardId, legacyCard.OwnerOrganizationUserId,
+                        "Creative Director", null, null, 1, [legacyCard])], legacyCard.OwnerOrganizationUserId)))
+            .RegisterCapability<RequeuePersonalTodoItemRequest, PersonalTodoItem>(PersonalTodoCapabilities.Requeue,
+                (request, _) =>
+                {
+                    Assert.Equal(legacyCard!.Id, request.ItemId);
+                    requeued++;
+                    return Task.FromResult(legacyCard with { Status = PersonalTodoStatuses.Ready });
                 });
 
         await new VideoGameCreativeDirectorAgent().HandleAttentionReviewAsync(
@@ -189,8 +207,26 @@ public sealed class CreativeDirectorInteractionTests
         Assert.NotNull(captured);
         Assert.Equal($"creative-project-review:{conversationId:N}", captured.IdempotencyKey);
         Assert.Equal(CreativeDirectorAgenda.ProjectReviewCorrelation(conversationId), captured.CorrelationId);
-        Assert.Null(captured.SourceConversationId);
+        Assert.Equal(conversationId, captured.SourceConversationId);
         Assert.Null(captured.SourceMessageId);
+        Assert.Equal(1, requeued);
+    }
+
+    [Fact]
+    public void LegacyProjectReviewRecoversConversationFromCorrelation()
+    {
+        var conversationId = Guid.NewGuid();
+        var item = PersonalItem("Review creative direction", CreativeDirectorAgenda.ProjectReviewCorrelation(conversationId),
+            conversationId) with { SourceConversationId = null };
+        Assert.Equal(conversationId, CreativeDirectorAgenda.ProjectReviewConversationId(item));
+        Assert.Null(CreativeDirectorAgenda.ProjectReviewConversationId(item with
+        {
+            SourceConversationId = Guid.NewGuid()
+        }));
+        Assert.Null(CreativeDirectorAgenda.ProjectReviewConversationId(item with
+        {
+            CorrelationId = $"{CreativeDirectorAgenda.ProjectReviewKind}:invalid"
+        }));
     }
 
     [Fact]

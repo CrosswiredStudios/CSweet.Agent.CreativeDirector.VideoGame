@@ -32,7 +32,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.11.0";
+    public override string Version => "1.11.1";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -331,14 +331,15 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
 
         if (CreativeDirectorAgenda.IsProjectReview(item))
         {
-            if (!item.SourceConversationId.HasValue)
+            var conversationId = CreativeDirectorAgenda.ProjectReviewConversationId(item);
+            if (!conversationId.HasValue)
                 return PersonalTodoResult.Blocked("A portfolio review requires its source project conversation.");
 
             var current = await ReadStateForConversationAsync(
-                item.SourceConversationId, context, cancellationToken);
+                conversationId, context, cancellationToken);
             await ReconcileAsync(item.Id, context, cancellationToken, current.State, current.Revision);
             current = await ReadStateForConversationAsync(
-                item.SourceConversationId, context, cancellationToken);
+                conversationId, context, cancellationToken);
 
             var cadence = CreativeDirectorAgenda.ProjectReviewCadence(current.State.Phase);
             var reason = current.State.Phase == CreativeDirectorPhase.Oversight
@@ -2010,7 +2011,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 "Create the governed project aggregate, team boundary, lifecycle gates, evidence chain, and Creative Director supervision assignment for the accepted game vision.",
                 $"video-game-workstream:{state.AcceptedVision.Digest}",
                 VideoGameProfileKeys.ProductionV2,
-                4,
+                5,
                 JsonSerializer.SerializeToElement(metadata, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
                 new WorkstreamAuthorityEnvelope(
                     0.05m, 14,
@@ -2462,15 +2463,19 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         var index = await ReadPortfolioIndexAsync(context, cancellationToken);
         foreach (var entry in index.Projects.OrderBy(x => x.UpdatedAt))
         {
-            _ = await context.Platform.PersonalTodo.AddAsync(new AddPersonalTodoItemRequest(
+            var task = await context.Platform.PersonalTodo.AddAsync(new AddPersonalTodoItemRequest(
                 $"Review creative direction: {entry.WorkingTitle}",
                 $"Reconcile the durable creative state for project conversation {entry.ConversationId:D}, " +
                 "advance any work that is currently actionable, and remain responsible through launch, live operations, updates, expansions, DLC, or sequel recommendation.",
                 entry.Phase == CreativeDirectorPhase.Oversight ? WorkPriorities.Medium : WorkPriorities.High,
                 null,
                 $"creative-project-review:{entry.ConversationId:N}",
+                SourceConversationId: entry.ConversationId,
                 CorrelationId: CreativeDirectorAgenda.ProjectReviewCorrelation(entry.ConversationId)),
                 cancellationToken);
+            if (task.Status == PersonalTodoStatuses.Blocked &&
+                task.BlockReason == "A portfolio review requires its source project conversation.")
+                await TryRequeuePersonalTodoAsync(task.Id, context, cancellationToken);
         }
     }
 

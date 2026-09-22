@@ -184,6 +184,16 @@ The unpublished profile revision 5 now declares source-control.merge.execute.v2 
 ### Existing-project upgrade proposal (1.8.0)
 Portfolio reconciliation detects older pinned game execution profiles before a team board exists and proposes the packaged revision through the managed workstream-change capability. The proposal binds the current workstream revision and target digest; its approval response is durably cached under a stable key to avoid repeat proposals. The Director does not approve the upgrade itself. Existing boards require separate policy migration. No new capability is requested.
 
+### Producer planning recovery (1.11.1)
+
+Project setup proposes the active production profile revision 5. Earlier installations requested
+revision 4 after packaging revision 5, so the workstream proposal failed before the Producer
+could receive the scoped production-brief handoff. Portfolio-review tasks now retain their
+source conversation, and legacy reviews blocked for a missing source are requeued using the
+project correlation. After upgrading, a human still needs to approve the workstream proposal;
+the Producer and Director then refine the brief and review staffing proposals through the
+existing approval workflow.
+
 ## Release notes
 
 See [versioned release notes](releases/README.md). Add the matching note with every agent version change.
