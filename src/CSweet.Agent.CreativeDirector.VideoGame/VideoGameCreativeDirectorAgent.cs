@@ -23,7 +23,6 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
     internal const int DefaultPitchContextWindowTokens = 220_000;
     internal const int DefaultPitchOutputTokens = 32_000;
     internal const int MinimumPitchOutputTokens = 2_048;
-    internal const int MaximumPitchOutputTokens = 32_768;
     private const string EnginePitchConflictError = "The configured model did not preserve the specified game engine.";
     private static readonly IReadOnlyList<AskUserOption> InvolvementOptions =
     [
@@ -33,7 +32,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.11.4";
+    public override string Version => "1.11.5";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -42,11 +41,11 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
             description: "A multimodal-capable model is recommended for concept art and PDF references.")
         .Number("maxContextWindowTokens", "Maximum context-window tokens", required: true,
             description: "Planning ceiling for high-level game vision generation; set this no higher than the selected model's real context window.",
-            minimum: 32_769, maximum: 2_000_000, step: 1_000,
+            minimum: 32_769, step: 1_000,
             defaultValue: DefaultPitchContextWindowTokens)
         .Number("maxOutputTokens", "Maximum pitch output tokens", required: true,
-            description: "Budget for one high-level game vision response, including model reasoning. The provider may impose a lower ceiling.",
-            minimum: MinimumPitchOutputTokens, maximum: MaximumPitchOutputTokens, step: 1_000,
+            description: "Budget for one high-level game vision response, including model reasoning. Set this within the selected model and provider's supported limits.",
+            minimum: MinimumPitchOutputTokens, step: 1_000,
             defaultValue: DefaultPitchOutputTokens,
             lessThanFieldKey: "maxContextWindowTokens");
 
@@ -976,8 +975,8 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
     {
         var contextWindow = Math.Max(settings.GetInt32("maxContextWindowTokens", DefaultPitchContextWindowTokens),
             MinimumPitchOutputTokens + 1);
-        var output = Math.Clamp(settings.GetInt32("maxOutputTokens", DefaultPitchOutputTokens),
-            MinimumPitchOutputTokens, MaximumPitchOutputTokens);
+        var output = Math.Max(settings.GetInt32("maxOutputTokens", DefaultPitchOutputTokens),
+            MinimumPitchOutputTokens);
         return Math.Min(output, contextWindow - 1);
     }
 
@@ -2553,7 +2552,6 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
                 entry.Phase == CreativeDirectorPhase.Oversight ? WorkPriorities.Medium : WorkPriorities.High,
                 null,
                 $"creative-project-review:{entry.ConversationId:N}",
-                SourceConversationId: entry.ConversationId,
                 CorrelationId: CreativeDirectorAgenda.ProjectReviewCorrelation(entry.ConversationId)),
                 cancellationToken);
             if (task.Status == PersonalTodoStatuses.Blocked &&

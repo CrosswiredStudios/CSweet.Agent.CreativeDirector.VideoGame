@@ -222,11 +222,11 @@ public sealed class CreativeDirectorLifecycleTests
     {
         Assert.Equal(32_000, VideoGameCreativeDirectorAgent.ResolvePitchOutputTokens(
             new AgentSettings(new Dictionary<string, JsonElement>())));
-        Assert.Equal(32_768, VideoGameCreativeDirectorAgent.ResolvePitchOutputTokens(
+        Assert.Equal(128_000, VideoGameCreativeDirectorAgent.ResolvePitchOutputTokens(
             new AgentSettings(new Dictionary<string, JsonElement>
             {
                 ["maxContextWindowTokens"] = JsonSerializer.SerializeToElement(220_000),
-                ["maxOutputTokens"] = JsonSerializer.SerializeToElement(32_768)
+                ["maxOutputTokens"] = JsonSerializer.SerializeToElement(128_000)
             })));
         Assert.Equal(24_999, VideoGameCreativeDirectorAgent.ResolvePitchOutputTokens(
             new AgentSettings(new Dictionary<string, JsonElement>

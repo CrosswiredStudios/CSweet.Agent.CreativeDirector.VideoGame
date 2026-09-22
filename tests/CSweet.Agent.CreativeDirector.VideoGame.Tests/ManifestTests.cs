@@ -23,6 +23,12 @@ public sealed class ManifestTests
             field => field.Key == "maxOutputTokens");
         Assert.Equal(220_000, contextWindow.DefaultValue!.Value.GetInt32());
         Assert.Equal(32_000, outputTokens.DefaultValue!.Value.GetInt32());
+        using var document = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(path));
+        var configuration = document.RootElement.GetProperty("configuration").EnumerateArray().ToArray();
+        Assert.False(configuration.Single(field => field.GetProperty("key").GetString() ==
+            "maxContextWindowTokens").TryGetProperty("maximum", out _));
+        Assert.False(configuration.Single(field => field.GetProperty("key").GetString() ==
+            "maxOutputTokens").TryGetProperty("maximum", out _));
         Assert.Equal("maxContextWindowTokens", outputTokens.LessThanFieldKey);
         Assert.Contains(manifest.Requires, x => x.Name == "work.board.read" && x.Scope == "team");
         Assert.Contains(manifest.Requires, x => x.Name == "work.item.read" && x.Scope == "team");

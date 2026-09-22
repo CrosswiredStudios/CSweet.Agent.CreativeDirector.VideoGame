@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.11.4`
+- Version: `1.11.5`
 - The Creative Director reviews direct-report planning decisions against the accepted brief, resolves delegated direction, and escalates material changes to the CEO.
 - Initial delivery team review: Technical Director, game engineer, and QA can be proposed together from the exact accepted brief; additional roles require scoped backlog evidence.
 - Provides: `creative-direction.game-vision.v1`
@@ -99,8 +99,9 @@ from a single observation and remain subject to platform approval.
 The installation settings **Maximum context-window tokens** (`maxContextWindowTokens`, default
 220,000) and **Maximum pitch output tokens** (`maxOutputTokens`, default 32,000) reserve a
 high-level game-vision response budget that includes model reasoning. Output must be less than
-context. The context setting is a planning ceiling, not a way to enlarge the selected model's
-actual context window; the provider may also impose a lower output ceiling. If the model spends
+context. The agent does not impose a fixed maximum on either setting, so they can match the selected
+model. The context setting is a planning ceiling, not a way to enlarge the model's actual context
+window; the selected model and provider remain authoritative limits. If the model spends
 the whole output budget on reasoning and returns no pitch text, adjust these settings and retry
 the saved direction. Other Creative Director responses use the provider's normal output limit.
 

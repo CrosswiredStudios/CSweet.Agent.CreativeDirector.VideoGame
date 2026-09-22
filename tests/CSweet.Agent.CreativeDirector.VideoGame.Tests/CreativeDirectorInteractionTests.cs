@@ -207,7 +207,7 @@ public sealed class CreativeDirectorInteractionTests
         Assert.NotNull(captured);
         Assert.Equal($"creative-project-review:{conversationId:N}", captured.IdempotencyKey);
         Assert.Equal(CreativeDirectorAgenda.ProjectReviewCorrelation(conversationId), captured.CorrelationId);
-        Assert.Equal(conversationId, captured.SourceConversationId);
+        Assert.Null(captured.SourceConversationId);
         Assert.Null(captured.SourceMessageId);
         Assert.Equal(1, requeued);
     }
