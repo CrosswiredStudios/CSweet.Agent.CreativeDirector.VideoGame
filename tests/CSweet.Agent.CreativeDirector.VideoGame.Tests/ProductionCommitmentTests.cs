@@ -7,6 +7,71 @@ namespace CSweet.Agent.CreativeDirector.VideoGame.Tests;
 public sealed class ProductionCommitmentTests
 {
     [Fact]
+    public void ProductionQuestionsAreHumanReadableAndDistinguishAssetsFromBuildCapacity()
+    {
+        var assets = VideoGameCreativeDirectorAgent.BuildAssetStrategyQuestion();
+        var build = VideoGameCreativeDirectorAgent.BuildUnavailableToolchainQuestion(
+            CrosswiredStudios.VideoGame.Contracts.VideoGameToolchainRecipeKeys.PhaserWeb2D);
+
+        Assert.Contains("visual and audio assets", assets);
+        Assert.DoesNotContain("{", assets);
+        Assert.Contains("Phaser 2D web", build);
+        Assert.Contains("Node/TypeScript build runner", build);
+        Assert.Contains("not a request to change engines", build);
+    }
+
+    [Fact]
+    public async Task ToolchainCapacityDoesNotEscalateBeforeTechnicalLeadershipExists()
+    {
+        var state = State() with
+        {
+            ManagerPreferences = new ManagerPreferenceProfile { EnginePreferences = ["latest Phaser"] }
+        };
+        var result = await new VideoGameCreativeDirectorAgent().EnsureToolchainDecisionAsync(
+            state, 1, Guid.NewGuid(), new AgentTestRuntime().CreateContext(), default);
+
+        Assert.False(result.Ready);
+        Assert.Null(result.State.ToolchainBlockerDecisionId);
+    }
+
+    [Fact]
+    public async Task MissingCapacityQuestionUsesTheManagerSelectedPhaserRecipe()
+    {
+        DecisionRequest? decision = null;
+        var state = State() with
+        {
+            ManagerPreferences = new ManagerPreferenceProfile { EnginePreferences = ["latest Phaser"] },
+            SpecialistEmployeeIds = new Dictionary<string, Guid>
+            {
+                [CrosswiredStudios.VideoGame.Contracts.VideoGameRoleKeys.TechnicalDirector] = Guid.NewGuid()
+            }
+        };
+        var runtime = new AgentTestRuntime()
+            .RegisterCapability<ReadToolchainCatalogV2Request, IReadOnlyList<EligibleToolchainAdapter>>(
+                PlatformCapabilities.ToolchainCatalogRead, (request, _) =>
+                {
+                    Assert.Equal(CrosswiredStudios.VideoGame.Contracts.VideoGameToolchainRecipeKeys.PhaserWeb2D,
+                        request.RecipeKey);
+                    return Task.FromResult<IReadOnlyList<EligibleToolchainAdapter>>([]);
+                })
+            .RegisterCapability<DecisionRequest, DecisionRecord>(DecisionCapabilityNames.RequestV1,
+                (request, _) =>
+                {
+                    decision = request;
+                    return Task.FromException<DecisionRecord>(new InvalidOperationException("captured"));
+                });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new VideoGameCreativeDirectorAgent().EnsureToolchainDecisionAsync(
+                state, 1, Guid.NewGuid(), runtime.CreateContext(), default));
+
+        Assert.NotNull(decision);
+        Assert.Contains("Phaser 2D web", decision.Summary);
+        Assert.DoesNotContain("babylon", decision.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(["restore-capacity", "pause"], decision.Options.Select(x => x.Id));
+    }
+
+    [Fact]
     public async Task PlanningQueuesIndependentStableTasksWithoutExecutingDecisionsOrRequeueingBlockers()
     {
         var state = State();

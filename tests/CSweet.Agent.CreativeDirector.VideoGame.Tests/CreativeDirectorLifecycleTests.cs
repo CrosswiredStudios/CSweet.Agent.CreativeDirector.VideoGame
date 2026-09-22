@@ -277,6 +277,62 @@ public sealed class CreativeDirectorLifecycleTests
     }
 
     [Fact]
+    public void ExplicitLatestPhaserIsRetainedAndCanBeReplaced()
+    {
+        var firstMessageId = Guid.NewGuid();
+        var preferences = VideoGameCreativeDirectorAgent.UpdateManagerPreferences(
+            new ManagerPreferenceProfile(),
+            "Make a polished 2D Breakout game for web using the latest Phaser engine.",
+            firstMessageId, [], applyDefault: true);
+
+        Assert.Equal(["latest Phaser"], preferences.EnginePreferences);
+        Assert.Equal("latest Phaser", VideoGameCreativeDirectorAgent.PreferredEngineLabel(
+            preferences with { EnginePreferences = ["JavaScript", "latest Phaser"] }));
+        Assert.Contains(firstMessageId, preferences.SupportingMessageIds);
+        Assert.Equal(VideoGameToolchainRecipeKeys.PhaserWeb2D,
+            VideoGameCreativeDirectorAgent.DetermineRequiredRecipe(new CreativeDirectorOperatingState
+            {
+                ManagerPreferences = preferences
+            }));
+
+        var secondMessageId = Guid.NewGuid();
+        preferences = VideoGameCreativeDirectorAgent.UpdateManagerPreferences(preferences,
+            "Change the engine to Babylon.js instead.", secondMessageId, [], applyDefault: true);
+        Assert.Equal(["Babylon.js"], preferences.EnginePreferences);
+        Assert.Contains(secondMessageId, preferences.SupportingMessageIds);
+    }
+
+    [Fact]
+    public void PitchReviewRejectsSilentEngineOrVersionSubstitution()
+    {
+        var preferences = new ManagerPreferenceProfile { EnginePreferences = ["latest Phaser"] };
+
+        Assert.Null(VideoGameCreativeDirectorAgent.PitchEngineConflict(preferences,
+            "A 2D web brick breaker using the latest compatible Phaser release. No Babylon or 3D."));
+        Assert.NotNull(VideoGameCreativeDirectorAgent.PitchEngineConflict(preferences,
+            "A 2D web brick breaker using Phaser 3."));
+        Assert.NotNull(VideoGameCreativeDirectorAgent.PitchEngineConflict(preferences,
+            "A 3D web brick breaker using Babylon.js."));
+        Assert.NotNull(VideoGameCreativeDirectorAgent.PitchEngineConflict(preferences,
+            "A 2D web brick breaker with no named game engine."));
+    }
+
+    [Fact]
+    public void ExplicitEngineIsIncludedInScopedProjectMemory()
+    {
+        var incoming = new CommunicationMessageReceivedEvent(
+            Guid.NewGuid(), Guid.NewGuid().ToString("D"), "manager-user",
+            "Make a 2D web Breakout game using the latest Phaser engine.",
+            new Dictionary<string, string>(), Guid.NewGuid(), 1, Guid.NewGuid());
+
+        var proposals = VideoGameCreativeDirectorAgent.BuildExplicitMemoryProposals(
+            incoming, Guid.NewGuid().ToString("D"), Guid.NewGuid().ToString("D"), Guid.NewGuid().ToString("D"));
+
+        Assert.Contains(proposals, proposal => proposal.Scope == MemoryScope.Tenant &&
+            proposal.Content.Contains("latest Phaser", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void ExplicitNarrativeDirectionIsProjectStateNotUserParticipation()
     {
         var preferences = VideoGameCreativeDirectorAgent.UpdateManagerPreferences(
@@ -341,6 +397,37 @@ public sealed class CreativeDirectorLifecycleTests
         };
 
         Assert.Equal(expected, VideoGameCreativeDirectorAgent.DetermineRequiredRecipe(state));
+    }
+
+    [Theory]
+    [InlineData("Top-down 2D web game. Phaser 3. No 3D or native builds.")]
+    [InlineData("2D web game with 3D-like light effects, but without 3D gameplay.")]
+    public void NegativeThreeDimensionalLanguageDoesNotSelectBabylon(string pitch)
+    {
+        var state = new CreativeDirectorOperatingState
+        {
+            AcceptedVision = new AcceptedGameVision(1, "digest", pitch, Guid.NewGuid(), Guid.NewGuid(),
+                "hash", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow)
+        };
+
+        Assert.Equal(VideoGameToolchainRecipeKeys.PhaserWeb2D,
+            VideoGameCreativeDirectorAgent.DetermineRequiredRecipe(state));
+    }
+
+    [Fact]
+    public void ExplicitPhaserOutranksContradictoryPitchLanguage()
+    {
+        var state = new CreativeDirectorOperatingState
+        {
+            ManagerPreferences = new ManagerPreferenceProfile { EnginePreferences = ["latest Phaser"] },
+            AcceptedVision = new AcceptedGameVision(1, "digest", "A 3D web game using Babylon.",
+                Guid.NewGuid(), Guid.NewGuid(), "hash", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+                DateTimeOffset.UtcNow)
+        };
+
+        Assert.Equal(VideoGameToolchainRecipeKeys.PhaserWeb2D,
+            VideoGameCreativeDirectorAgent.DetermineRequiredRecipe(state));
+        Assert.Contains("latest Phaser", VideoGameCreativeDirectorAgent.SystemPrompt);
     }
 
     [Theory]

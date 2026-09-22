@@ -195,6 +195,16 @@ after its exact documents have been accepted. After upgrading, a human still nee
 the Producer and Director then refine the brief and review staffing proposals through the
 existing approval workflow.
 
+### Production-choice clarity and engine fidelity (1.11.2)
+
+The Director stores explicit Phaser/Babylon.js choices and preserves a "latest Phaser" request
+through pitch generation and workstream metadata. A contradictory model draft is corrected once
+before submission, then withheld if it still conflicts. Recipe selection does not interpret
+"no 3D" as a 3D requirement. Asset sourcing is asked in plain language, with machine-readable
+strategy details retained separately. Managed build-runner capacity is assessed after the
+Technical Director joins; missing capacity does not stop documentation or staffing planning.
+This agent update does not install a toolchain adapter or certify an Office image.
+
 ## Release notes
 
 See [versioned release notes](releases/README.md). Add the matching note with every agent version change.
