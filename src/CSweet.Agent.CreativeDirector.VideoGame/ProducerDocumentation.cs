@@ -25,7 +25,7 @@ public sealed partial class VideoGameCreativeDirectorAgent
     private const string ProducerDocumentsPrefix = "creative-producer-documents:";
 
     internal static async Task QueueProducerDocumentationAsync(CreativeDirectorOperatingState state,
-        AgentRuntimeContext context, CancellationToken token)
+        AgentRuntimeContext context, CancellationToken token, bool requeueBlockedOnly = false)
     {
         if (state.AcceptedVision is not { } vision) return;
         var correlation = $"{ProducerDocumentsPrefix}{vision.ConversationId:N}:{vision.Digest}";
@@ -37,7 +37,8 @@ public sealed partial class VideoGameCreativeDirectorAgent
         {
             WorkContext = new PersonalTodoWorkContext(WorkstreamId: state.WorkstreamId, TeamId: state.TeamId)
         }, token);
-        await TryRequeuePersonalTodoAsync(task.Id, context, token);
+        if (!requeueBlockedOnly || task.Status == PersonalTodoStatuses.Blocked)
+            await TryRequeuePersonalTodoAsync(task.Id, context, token);
     }
 
     private async Task<PersonalTodoResult> PrepareProducerDocumentationAsync(PersonalTodoItem item,

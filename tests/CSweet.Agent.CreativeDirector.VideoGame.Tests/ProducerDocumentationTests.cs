@@ -7,6 +7,57 @@ namespace CSweet.Agent.CreativeDirector.VideoGame.Tests;
 public sealed class ProducerDocumentationTests
 {
     [Fact]
+    public async Task AcceptedDocumentsRequeueOnlyAPreviouslyBlockedHandoff()
+    {
+        var conversation = Guid.NewGuid();
+        var director = Guid.NewGuid();
+        var state = new CreativeDirectorOperatingState
+        {
+            AcceptedVision = new(1, "digest", "# Accepted vision", Guid.NewGuid(), Guid.NewGuid(),
+                "hash", conversation, Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow),
+            HighLevelArtifactId = Guid.NewGuid(),
+            HighLevelAcceptedRevisionId = Guid.NewGuid()
+        };
+        var status = PersonalTodoStatuses.Blocked;
+        var requeues = 0;
+        PersonalTodoItem? task = null;
+        var runtime = new AgentTestRuntime()
+            .RegisterCapability<AddPersonalTodoItemRequest, PersonalTodoItem>(PersonalTodoCapabilities.Add,
+                (request, _) =>
+                {
+                    task = new PersonalTodoItem(Guid.NewGuid(), Guid.NewGuid(), director, director,
+                        "Director", request.Title, request.Description!, status, request.Priority,
+                        1, 1, null, request.SourceConversationId, request.SourceMessageId, [], null, null,
+                        DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)
+                    {
+                        CorrelationId = request.CorrelationId,
+                        BlockReason = status == PersonalTodoStatuses.Blocked
+                            ? "This task stopped after an execution failure exhausted automatic recovery."
+                            : null
+                    };
+                    return Task.FromResult(task);
+                })
+            .RegisterCapability<JsonElement, PersonalTodoDirectory>(PersonalTodoCapabilities.Read,
+                (_, _) => Task.FromResult(new PersonalTodoDirectory(
+                    [new PersonalTodoBoard(task!.BoardId, director, "Director", null, null, 1, [task])], director)))
+            .RegisterCapability<RequeuePersonalTodoItemRequest, PersonalTodoItem>(PersonalTodoCapabilities.Requeue,
+                (_, _) =>
+                {
+                    requeues++;
+                    return Task.FromResult(task! with { Status = PersonalTodoStatuses.Ready });
+                });
+
+        var context = runtime.CreateContext();
+        await VideoGameCreativeDirectorAgent.QueueProducerDocumentationAsync(state, context, default,
+            requeueBlockedOnly: true);
+        Assert.Equal(1, requeues);
+        status = PersonalTodoStatuses.Ready;
+        await VideoGameCreativeDirectorAgent.QueueProducerDocumentationAsync(state, context, default,
+            requeueBlockedOnly: true);
+        Assert.Equal(1, requeues);
+    }
+
+    [Fact]
     public async Task MissingDocumentCreatesPersonalWorkAndReconstructsSavedScopeForReview()
     {
         var conversation = Guid.NewGuid(); var director = Guid.NewGuid(); var manager = Guid.NewGuid();

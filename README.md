@@ -190,7 +190,8 @@ Project setup proposes the active production profile revision 5. Earlier install
 revision 4 after packaging revision 5, so the workstream proposal failed before the Producer
 could receive the scoped production-brief handoff. Portfolio-review tasks now retain their
 source conversation, and legacy reviews blocked for a missing source are requeued using the
-project correlation. After upgrading, a human still needs to approve the workstream proposal;
+project correlation. Reconciliation also requeues a previously failed documentation handoff
+after its exact documents have been accepted. After upgrading, a human still needs to approve the workstream proposal;
 the Producer and Director then refine the brief and review staffing proposals through the
 existing approval workflow.
 

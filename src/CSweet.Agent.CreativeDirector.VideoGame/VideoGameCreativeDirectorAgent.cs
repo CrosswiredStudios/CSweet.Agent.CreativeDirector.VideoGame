@@ -1544,6 +1544,9 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
             await QueueProducerDocumentationAsync(state, context, cancellationToken);
             return;
         }
+        // The accepted documents can outlive a failed project-setup attempt. Keep their
+        // correlated handoff task eligible so an upgraded agent resumes that same work.
+        await QueueProducerDocumentationAsync(state, context, cancellationToken, requeueBlockedOnly: true);
         var foundation = await EnsureProjectFoundationAsync(
             state, revision, approvedTeamId, producerEmployeeId, reviewId, context, cancellationToken);
         state = foundation.State;
