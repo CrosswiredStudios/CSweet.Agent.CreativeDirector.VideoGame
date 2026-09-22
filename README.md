@@ -5,7 +5,8 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.11.0`
+- Version: `1.11.3`
+- Initial delivery team review: Technical Director, game engineer, and QA can be proposed together from the exact accepted brief; additional roles require scoped backlog evidence.
 - Provides: `creative-direction.game-vision.v1`
 - Role profile: `manager.v1`
 - Declared role: `creative-director`

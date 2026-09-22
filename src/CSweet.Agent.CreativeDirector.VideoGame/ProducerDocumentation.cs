@@ -14,11 +14,21 @@ public sealed partial class VideoGameCreativeDirectorAgent
             !CrosswiredStudios.VideoGame.PitchCollaboration.PitchProtocol.Matches(review, approval) ||
             !resource.Evidence.Any(x => x.SourceRevision == approval.RevisionSha256))
             return "Initial staffing requires the Producer's confident review and the Director's exact accepted production brief.";
-        var additions = resource.Deltas.Where(x => x.ChangeKind is "Add" or "Increase").ToList();
-        if (resource.Deltas.Count != 1 || additions.Count != 1 || additions[0].ChangeKind != "Add" || additions[0].Role.RoleKey != VideoGameRoleKeys.TechnicalDirector ||
-            additions[0].Role.Headcount != 1 || roster.Members.Any(x => x.IsAvailable &&
-                x.DeclaredRoleKeys.Contains(VideoGameRoleKeys.TechnicalDirector)))
-            return "Before board planning, propose one missing Technical Director to assess and decompose the accepted scope.";
+        string[] baselineRoles = [VideoGameRoleKeys.TechnicalDirector, VideoGameRoleKeys.Engineer,
+            VideoGameRoleKeys.QualityAssurance];
+        var missing = baselineRoles.Where(role => !roster.Members.Any(x => x.IsAvailable &&
+            x.DeclaredRoleKeys.Contains(role, StringComparer.Ordinal))).ToHashSet(StringComparer.Ordinal);
+        var additions = resource.Deltas.Where(x => x.ChangeKind == "Add").ToList();
+        var proposed = additions.Select(x => x.Role.RoleKey).ToHashSet(StringComparer.Ordinal);
+        // Accept existing single-lead Producers during upgrade; current Producers propose
+        // every missing baseline role together. Other roles require scoped backlog evidence.
+        var legacyLeadOnly = proposed.SetEquals([VideoGameRoleKeys.TechnicalDirector]);
+        if (!missing.Contains(VideoGameRoleKeys.TechnicalDirector) ||
+            additions.Count != resource.Deltas.Count ||
+            additions.Count != proposed.Count ||
+            additions.Any(x => x.Role.Headcount != 1) ||
+            !(proposed.SetEquals(missing) || legacyLeadOnly))
+            return "Before board planning, propose the missing Technical Director and baseline Engineer and QA coverage from the accepted brief.";
         return null;
     }
 
