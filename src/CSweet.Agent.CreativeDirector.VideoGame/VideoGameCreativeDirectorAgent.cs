@@ -11,8 +11,10 @@ using Microsoft.Extensions.Options;
 
 namespace CSweet.Agent.CreativeDirector.VideoGame;
 
-public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
+public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentBase
 {
+    protected override string ManagementResponsibility => "creative direction";
+
     public const string StateKey = "video-game-creative-direction";
     public const string PortfolioStateKey = "video-game-creative-direction:portfolio";
     public const string GameVisionCapability = "creative-direction.game-vision.v1";
@@ -32,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.11.5";
+    public override string Version => "1.13.0";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -49,7 +51,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
             defaultValue: DefaultPitchOutputTokens,
             lessThanFieldKey: "maxContextWindowTokens");
 
-    public override async Task HandleEventAsync(
+    protected override async Task HandleManagerEventAsync(
         AgentEventEnvelope message,
         AgentRuntimeContext context,
         CancellationToken cancellationToken)
@@ -245,11 +247,12 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetAgentBase
         await ReconcileDetailedPackageAsync(context, cancellationToken, resourceEvent.Context.WorkstreamId);
     }
 
-    public override async Task HandleAttentionReviewAsync(
+    protected override async Task HandleManagerAttentionReviewAsync(
         AgentAttentionReviewContext review,
         AgentRuntimeContext context,
         CancellationToken cancellationToken)
     {
+
         await ReviewPendingStaffingAsync(context, cancellationToken);
         await ReconcilePortfolioAsync(review.ReviewId, context, cancellationToken);
         await EnsurePortfolioAgendaAsync(context, cancellationToken);

@@ -3,8 +3,10 @@
   "manifestVersion": "2.0",
   "kind": "agent",
   "rolePolicy": {
+    "baseType": "manager",
     "profile": "manager.v1",
     "declaredRoleKeys": [
+      "manager",
       "creative-director"
     ],
     "specializationKeys": [
@@ -14,7 +16,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "Naomi Chen",
-  "version": "1.11.5",
+  "version": "1.13.0",
   "publisher": {
     "id": "com.csweet",
     "name": "C-Sweet"
@@ -99,6 +101,21 @@
     }
   ],
   "requires": [
+    {
+      "name": "platform.project-health.read.v1",
+      "scope": "organization",
+      "purpose": "Inspect and assess incidents within current project and reporting authority."
+    },
+    {
+      "name": "platform.project-health.diagnostics.read.v1",
+      "scope": "organization",
+      "purpose": "Inspect and assess incidents within current project and reporting authority."
+    },
+    {
+      "name": "platform.management.incident.report.v1",
+      "scope": "organization",
+      "purpose": "Inspect and assess incidents within current project and reporting authority."
+    },
     {
       "name": "work.calendar.read.v1",
       "scope": "organization",
@@ -503,6 +520,16 @@
       "name": "platform.management.status-report.v1",
       "scope": "organization",
       "purpose": "Deliver attributed daily reports to the authoritative manager."
+    },
+    {
+      "name": "platform.management.incident.read.v1",
+      "scope": "organization",
+      "purpose": "Inspect assigned project incidents and escalate through the authorized reporting hierarchy."
+    },
+    {
+      "name": "platform.management.incident.forward.v1",
+      "scope": "organization",
+      "purpose": "Inspect assigned project incidents and escalate through the authorized reporting hierarchy."
     }
   ],
   "events": {
@@ -540,7 +567,9 @@
       "com.csweet.validation.completed.v1",
       "com.csweet.evaluation-session.completed.v1",
       "com.csweet.media-job.completed.v1",
-      "com.csweet.release-readiness.changed.v1"
+      "com.csweet.release-readiness.changed.v1",
+      "com.csweet.project-health.review-due.v1",
+      "com.csweet.management.incident.changed.v1"
     ]
   },
   "configuration": [

@@ -35,7 +35,9 @@ public sealed class ManifestTests
         Assert.Contains(VideoGameCreativeDirectorAgent.GameVisionCapability, manifest.Capabilities);
         Assert.NotNull(manifest.RolePolicy);
         Assert.Equal("manager.v1", manifest.RolePolicy!.Profile);
-        Assert.Equal(["creative-director"], manifest.RolePolicy.DeclaredRoleKeys);
+        Assert.Equal(["manager", "creative-director"], manifest.RolePolicy.DeclaredRoleKeys);
+        Assert.Equal(AgentBaseTypes.Manager, manifest.RolePolicy.BaseType);
+        Assert.IsAssignableFrom<CSweetManagerAgentBase>(agent);
         Assert.Equal(["video-game-development", "game-creative-direction"], manifest.RolePolicy.SpecializationKeys);
         Assert.Equal("AlwaysOn", manifest.Runtime.DefaultActivationMode);
         Assert.Contains(manifest.Requires, x => x.Name == PlatformCapabilities.BusinessProfileRead);

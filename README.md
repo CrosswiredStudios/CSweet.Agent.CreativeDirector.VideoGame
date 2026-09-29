@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.11.5`
+- Version: `1.13.0`
 - The Creative Director reviews direct-report planning decisions against the accepted brief, resolves delegated direction, and escalates material changes to the CEO.
 - Initial delivery team review: Technical Director, game engineer, and QA can be proposed together from the exact accepted brief; additional roles require scoped backlog evidence.
 - Provides: `creative-direction.game-vision.v1`
@@ -220,3 +220,26 @@ Requests business-scoped calendar read, create, update, cancel, and scheduling a
 Board and ticket reads use team scope. Approved team membership grants let the Director inspect its production backlog when reviewing subsequent staffing requests.
 
 Pending production planning decisions are relayed to the authoritative manager on decision-request events and portfolio reconciliation. Repeated attention reviews use the same notification key. Verified project-scoped decision notifications are acknowledgements, not requests to accept or change the vision; approval authority remains unchanged.
+
+## Project incident reporting
+
+Project-health and management-incident events are handled before ordinary workflow routing. The Producer
+reads sanitized project-scoped evidence and reports observed facts, likely causes, missing evidence, and a
+recommended action without invoking a model. Management agents forward operational failures outside their
+responsibility using the same incident identity. Attention reviews recover pending incidents after reconnect.
+
+The manifest requests incident read/forward capabilities; the Producer additionally requests health,
+diagnostics, and report capabilities. Approve these through the normal installation grant review. The
+platform enforces current project/reporting authority and advances unhandled hops after 15 minutes.
+No additional repair or automatic retry authority is requested.
+
+
+## Shared manager type
+
+The manifest declares `rolePolicy.baseType: "manager"` and `profile: "manager.v1"`.
+This agent derives from SDK `CSweetManagerAgentBase`; its job remains a specialized manager role.
+The shared base handles project-health/incident events and attention recovery before ordinary work.
+Diagnostic reads and assessment reports require the manifest's current approved project-health and
+incident grants. Monitoring covers current assigned projects only. The default diagnosis escalates;
+role-specific recovery can be added through `AssessIncidentAsync` using existing authorized operations.
+A recorded recovery request does not close the incident or extend its 15-minute escalation deadline.
