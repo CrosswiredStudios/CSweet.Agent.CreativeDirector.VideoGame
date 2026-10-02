@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using CSweet.Agent.SDK;
 using CrosswiredStudios.VideoGame.Contracts;
@@ -29,6 +30,17 @@ internal static class PitchProtocol
     public const string ReplyType = "video-game.production.pitch-reply.v1";
     public const string DocumentType = "video-game.production-plan.v1";
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    public static DirectorReview? ParseDirectorReview(string response)
+    {
+        // Providers may wrap the JSON in a code fence or append reasoning markup. Read the first
+        // complete object; malformed or incomplete JSON still fails and the turn is retried.
+        var start = response.IndexOf('{');
+        if (start < 0) throw new JsonException("The Creative Director response contains no JSON object.");
+        var reader = new Utf8JsonReader(Encoding.UTF8.GetBytes(response[start..]));
+        using var document = JsonDocument.ParseValue(ref reader);
+        return document.RootElement.Deserialize<DirectorReview>(Json);
+    }
+
     public static bool CanPlan(ProducerReview review) => CollaborationActions.IsReady(review.Ready, review.Questions, [], review.Rationale) && ValidDocument(review.DraftMarkdown);
     public static bool ValidDocument(string? markdown) => !string.IsNullOrWhiteSpace(markdown) && markdown.Length <= 192000 &&
         new[] { "Scope", "Player experience", "Non-goals", "Acceptance criteria", "Deliverables", "Constraints", "Risks", "Open questions" }

@@ -5,7 +5,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.13.0`
+- Version: `1.14.0`
 - The Creative Director reviews direct-report planning decisions against the accepted brief, resolves delegated direction, and escalates material changes to the CEO.
 - Initial delivery team review: Technical Director, game engineer, and QA can be proposed together from the exact accepted brief; additional roles require scoped backlog evidence.
 - Provides: `creative-direction.game-vision.v1`
@@ -243,3 +243,11 @@ Diagnostic reads and assessment reports require the manifest's current approved 
 incident grants. Monitoring covers current assigned projects only. The default diagnosis escalates;
 role-specific recovery can be added through `AssessIncidentAsync` using existing authorized operations.
 A recorded recovery request does not close the incident or extend its 15-minute escalation deadline.
+
+### Next-step reporting and stall escalation (1.14.0)
+
+Every project review derives the next step from durable state (`CreativeDirectorNextStep`) and shows it
+on the review card. A failed reconciliation is never reported as completed: it is recorded under
+`creative-reconcile-stall:<conversation>`, retried every ten minutes, and escalated to the CEO once after
+three consecutive failures of the same step. A Producer kickoff whose handoff task cannot be queued is
+answered with the next step instead of a failed turn; the review retries the same idempotent task.

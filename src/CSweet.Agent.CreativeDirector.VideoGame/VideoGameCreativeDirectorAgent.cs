@@ -34,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.13.0";
+    public override string Version => "1.14.0";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -340,14 +340,28 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
 
             var current = await ReadStateForConversationAsync(
                 conversationId, context, cancellationToken);
-            await ReconcileAsync(item.Id, context, cancellationToken, current.State, current.Revision);
+            try
+            {
+                await ReconcileAsync(item.Id, context, cancellationToken, current.State, current.Revision);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                // Never report a failed reconciliation as completed: name the stuck step, retry, and
+                // escalate a persistent stall so the project cannot sit silently.
+                return await ReportReconcileFailureAsync(conversationId.Value, exception, context, cancellationToken);
+            }
+            await ClearReconcileStallAsync(conversationId.Value, context, cancellationToken);
             current = await ReadStateForConversationAsync(
                 conversationId, context, cancellationToken);
 
             var cadence = CreativeDirectorAgenda.ProjectReviewCadence(current.State.Phase);
             var reason = current.State.Phase == CreativeDirectorPhase.Oversight
                 ? "Project remains under creative oversight, including launch and post-production work. Waiting for the next periodic review; project events and chat requests may wake work sooner."
-                : "Project reconciliation completed. Waiting briefly for decisions, artifacts, staffing, or other project events before the next deterministic review.";
+                : $"Project reconciled. Next step: {CreativeDirectorNextStep.Describe(current.State)}. Waiting briefly for decisions, artifacts, staffing, or other project events before the next deterministic review.";
             return PersonalTodoResult.WaitingUntil(DateTimeOffset.UtcNow.Add(cadence), reason);
         }
 
@@ -599,9 +613,28 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
             var kickoffs = await FindProducerKickoffsAsync(incoming, context, cancellationToken);
             if (kickoffs.Count > 0)
             {
+                var queueFailure = default(string);
                 foreach (var kickoff in kickoffs)
-                    await QueueProducerDocumentationAsync(kickoff.State, context, cancellationToken);
-                await stream.CommitAsync("I created a personal task to prepare and share the accepted pitch and high-level GDD with you. If documentation is missing, I will reconstruct it from our saved project direction and obtain review. We will use the shared brief to resolve scope questions and prepare your hiring proposal before technical leadership builds the team board.", cancellationToken);
+                {
+                    try
+                    {
+                        await QueueProducerDocumentationAsync(kickoff.State, context, cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        // The kickoff is durable evidence; project review retries the same idempotent
+                        // handoff task. Tell the Producer what happens next instead of failing the turn.
+                        queueFailure ??= ReconcileStallPolicy.Summarize(exception.Message);
+                    }
+                }
+                await stream.CommitAsync(queueFailure is null
+                    ? "I created a personal task to prepare and share the accepted pitch and high-level GDD with you. If documentation is missing, I will reconstruct it from our saved project direction and obtain review. We will use the shared brief to resolve scope questions and prepare your hiring proposal before technical leadership builds the team board."
+                    : $"I received your kickoff. Next step: I share the accepted pitch and high-level GDD with you, but queuing that handoff failed just now ({queueFailure}). My project review retries it automatically every few minutes and I will tell the CEO if it keeps failing, so you don't need to resend anything.",
+                    cancellationToken);
                 return;
             }
         }

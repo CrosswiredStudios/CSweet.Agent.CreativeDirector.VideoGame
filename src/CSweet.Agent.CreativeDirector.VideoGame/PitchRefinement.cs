@@ -45,7 +45,7 @@ public sealed partial class VideoGameCreativeDirectorAgent
                     """),
                 new ChatMessage(ChatRole.User, $"Accepted pitch:\n{pitch.Markdown}\nProducer review:\n{JsonSerializer.Serialize(review, PitchProtocol.Json)}\nShared draft:\n{revision.Content}\nConversation:\n{JsonSerializer.Serialize(request.Transcript, PitchProtocol.Json)}")
             ], cancellationToken: token);
-            var result = JsonSerializer.Deserialize<DirectorReview>(response.Text, PitchProtocol.Json);
+            var result = PitchProtocol.ParseDirectorReview(response.Text);
             if (result is null || string.IsNullOrWhiteSpace(result.Guidance) || result.Guidance.Length > 16000 ||
                 result.SuggestedMarkdown is null || result.SuggestedMarkdown.Length > 48000)
                 throw new InvalidOperationException("The Creative Director must answer the Producer with bounded substantive guidance.");
