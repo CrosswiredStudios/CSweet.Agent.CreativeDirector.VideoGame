@@ -34,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.14.1";
+    public override string Version => "1.14.2";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -646,6 +646,19 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         var currentMessage = ExtractCurrentMessage(incoming.Message);
         var isManager = IsAuthoritativeManager(incoming, context.Identity);
         var inboundDisposition = CreativeDirectorInteractionPolicy.Classify(currentMessage);
+
+        // A report's delivery blocker goes up my reporting chain instead of being rejected as non-creative.
+        if (DeliveryEscalationRelay.IsDeliveryEscalation(incoming, currentMessage, isManager) &&
+            Guid.TryParse(context.Identity?.ManagerEmployeeId, out var escalationManager) && escalationManager != Guid.Empty)
+        {
+            await context.Platform.Communication.SendDirectMessageAsync(escalationManager,
+                DeliveryEscalationRelay.ForwardMessage(
+                    incoming.Context?.GetValueOrDefault(CommunicationMessageContextKeys.SenderDisplayName),
+                    incoming.Context?.GetValueOrDefault(CommunicationMessageContextKeys.SenderRole), currentMessage),
+                DeliveryEscalationRelay.IdempotencyKey(incoming.MessageId, currentMessage), cancellationToken);
+            await stream.CommitAsync(DeliveryEscalationRelay.Acknowledgement(context.Identity?.ManagerDisplayName), cancellationToken);
+            return;
+        }
 
         if (!isManager && state.Phase != CreativeDirectorPhase.Oversight)
         {
