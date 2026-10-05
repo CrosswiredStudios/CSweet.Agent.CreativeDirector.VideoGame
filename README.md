@@ -2,6 +2,8 @@
 
 Provide durable video game vision and creative leadership from discovery through pitch approval, dedicated-studio formation, certified-toolchain selection, and production oversight.
 
+`ReviewProducerPitchAsync` requests concise answers and exact edits with an 8192-token ceiling, respecting a lower configured budget. Conversation text is sent without repeated artifact payloads. Acceptance of an unchanged submitted brief needs no replacement Markdown; the Producer's confidence and exact revision checks still gate staffing.
+
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
