@@ -34,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.14.3";
+    public override string Version => "1.15.0";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -2142,7 +2142,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
                 "Create the governed project aggregate, team boundary, lifecycle gates, evidence chain, and Creative Director supervision assignment for the accepted game vision.",
                 $"video-game-workstream:{state.AcceptedVision.Digest}",
                 VideoGameProfileKeys.ProductionV2,
-                5,
+                6,
                 JsonSerializer.SerializeToElement(metadata, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
                 new WorkstreamAuthorityEnvelope(
                     0.05m, 14,

@@ -60,9 +60,9 @@ public sealed class ManifestTests
         Assert.Contains(manifest.Requires, x => x.Name == PersonalTodoCapabilities.Defer);
         Assert.Contains(WorkstreamEventNames.ArtifactPackageSubmittedV1, manifest.Events.Subscribes);
         Assert.Contains(WorkstreamEventNames.ArtifactPackageDecidedV1, manifest.Events.Subscribes);
-        var profile = Assert.Single(manifest.WorkstreamProfiles.Provides);
+        var profile = Assert.Single(manifest.WorkstreamProfiles.Provides, x => x.Version == 6);
         Assert.Equal("video-game-production.v2", profile.Key);
-        Assert.Equal(5, profile.Version);
+        Assert.Equal(6, profile.Version);
         Assert.True(File.Exists(Path.Combine(root,
             profile.DefinitionResource.Replace('/', Path.DirectorySeparatorChar))));
         Assert.Empty(manifest.Credentials);

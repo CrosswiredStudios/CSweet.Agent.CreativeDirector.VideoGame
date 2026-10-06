@@ -7,7 +7,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.14.3`
+- Version: `1.15.0`
 - The Creative Director reviews direct-report planning decisions against the accepted brief, resolves delegated direction, and escalates material changes to the CEO.
 - Initial delivery team review: Technical Director, game engineer, and QA can be proposed together from the exact accepted brief; additional roles require scoped backlog evidence.
 - Provides: `creative-direction.game-vision.v1`
@@ -107,7 +107,7 @@ window; the selected model and provider remain authoritative limits. If the mode
 the whole output budget on reasoning and returns no pitch text, adjust these settings and retry
 the saved direction. Other Creative Director responses use the provider's normal output limit.
 
-Built with `CSweet.Agent.SDK` 3.47.0, `CSweet.Memory` 0.1.2.
+Built with `CSweet.Agent.SDK` 3.59.0, `CSweet.Memory` 0.1.2.
 
 
 ## Extension ownership and isolated builds
@@ -144,7 +144,7 @@ Reimport both agents to enable this protocol; legacy unrefined handoffs are bloc
 
 ## Shared collaboration SDK
 
-Uses CSweet.Agent.SDK 3.40.0 typed document references, explicit coordination read sharing,
+Uses CSweet.Agent.SDK 3.59.0 typed document references, explicit coordination read sharing,
 accepted-revision lookup, and handoff readiness checks. Pitch content and staffing judgment
 remain agent-specific. See the SDK's `docs/collaboration.md` for reusable documentation requests,
 clarification, review, and personal-work dependency waits. The matching C-Sweet host is required
@@ -253,3 +253,7 @@ on the review card. A failed reconciliation is never reported as completed: it i
 `creative-reconcile-stall:<conversation>`, retried every ten minutes, and escalated to the CEO once after
 three consecutive failures of the same step. A Producer kickoff whose handoff task cannot be queued is
 answered with the next step instead of a failed turn; the review retries the same idempotent task.
+
+## Hierarchical delivery
+
+The V2 assignment identifies Task, Story, Epic or Release scope. Tasks require an authorized sprint; aggregate reviews require an active delivery plan and do not invent sprint identities. Use the exact assigned branch, commit or artifact revision. Every task requires independent QA, including documents. Managers accept aggregate candidates using current evidence; task completion does not promote to main or authorize deployment.

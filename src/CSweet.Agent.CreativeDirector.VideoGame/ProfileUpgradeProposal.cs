@@ -12,11 +12,11 @@ public sealed partial class VideoGameCreativeDirectorAgent
     {
         if (workstreamId is not { } id) return;
         var workstream = await context.Platform.ReadWorkstreamAsync(new(id), token);
-        if (workstream.ProfileKey != "video-game-production.v2" || workstream.ProfileVersion is not < 5) return;
+        if (workstream.ProfileKey != "video-game-production.v2" || workstream.ProfileVersion is not < 6) return;
         var boards = await context.Platform.Work.ListBoardsAsync(cancellationToken: token);
         if (boards.Any(x => x.WorkstreamId == id && !x.IsArchived)) return;
         using var definition = JsonDocument.Parse(await File.ReadAllTextAsync(
-            Path.Combine(AppContext.BaseDirectory, "profiles", "video-game-production.v2.5.json"), token));
+            Path.Combine(AppContext.BaseDirectory, "profiles", "video-game-production.v2.6.json"), token));
         var request = BuildProfileUpgrade(workstream, definition.RootElement);
         if (request is null) return;
         var stateKey = "profile-upgrade:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(request.IdempotencyKey))).ToLowerInvariant();
