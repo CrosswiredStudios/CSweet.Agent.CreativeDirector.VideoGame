@@ -16,7 +16,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "Naomi Chen",
-  "version": "1.15.0",
+  "version": "1.17.0",
   "publisher": {
     "id": "com.csweet",
     "name": "C-Sweet"
@@ -453,24 +453,14 @@
       "purpose": "Make routine decisions explicitly authorized by the project authority envelope."
     },
     {
-      "name": "memory.user.read.v1",
-      "scope": "user",
-      "purpose": "Recall approved manager interaction and involvement preferences."
-    },
-    {
-      "name": "memory.user.propose.v1",
-      "scope": "user",
-      "purpose": "Propose explicit manager interaction and involvement preferences."
-    },
-    {
-      "name": "memory.business.read.v1",
+      "name": "platform.memory.query.v1",
       "scope": "organization",
-      "purpose": "Recall approved game-project decisions and creative references."
+      "purpose": "Recall authorized employee, manager-relationship, and shared business memory under current server policy."
     },
     {
-      "name": "memory.business.propose.v1",
+      "name": "platform.memory.write.v1",
       "scope": "organization",
-      "purpose": "Propose explicit platform, genre, narrative, and creative-reference decisions."
+      "purpose": "Propose explicit manager preferences and project decisions, and record supplied memory usage; server policy controls attribution and sensitivity."
     },
     {
       "name": "agent.onboarding.complete.v1",
@@ -486,6 +476,11 @@
       "name": "communication.chat.create.v1",
       "scope": "team",
       "purpose": "Open or reuse contextual direct conversations with the authoritative manager, Producer, and accountable specialists."
+    },
+    {
+      "name": "platform.user-action.suggest.v1",
+      "scope": "organization",
+      "purpose": "Attach a platform-resolved project approval card in the private conversation with the approver."
     },
     {
       "name": "communication.message.send.v1",

@@ -1,4 +1,5 @@
 using CSweet.Agent.SDK;
+using CSweet.Memory;
 using CSweet.WorkManagement.Contracts;
 
 namespace CSweet.Agent.CreativeDirector.VideoGame.Tests;
@@ -41,12 +42,13 @@ public sealed class ManifestTests
         Assert.Equal(["video-game-development", "game-creative-direction"], manifest.RolePolicy.SpecializationKeys);
         Assert.Equal("AlwaysOn", manifest.Runtime.DefaultActivationMode);
         Assert.Contains(manifest.Requires, x => x.Name == PlatformCapabilities.BusinessProfileRead);
+        Assert.Contains(manifest.Requires, x => x.Name == "platform.user-action.suggest.v1");
         Assert.Contains(manifest.Requires, x => x.Name == PlatformCapabilities.FinanceProfileRead);
         Assert.Contains(manifest.Requires, x => x.Name == PlatformCapabilities.OrganizationSnapshotRead);
-        Assert.Contains(manifest.Requires, x => x.Name == MemoryCapabilities.UserRead);
-        Assert.Contains(manifest.Requires, x => x.Name == MemoryCapabilities.UserPropose);
-        Assert.Contains(manifest.Requires, x => x.Name == MemoryCapabilities.BusinessRead);
-        Assert.Contains(manifest.Requires, x => x.Name == MemoryCapabilities.BusinessPropose);
+        Assert.Contains(manifest.Requires, x => x.Name == CSweetMemoryCapabilities.Query);
+        Assert.Contains(manifest.Requires, x => x.Name == CSweetMemoryCapabilities.Write);
+        Assert.DoesNotContain(manifest.Requires, x => x.Name == CSweetMemoryCapabilities.Manage ||
+            x.Name == CSweetMemoryCapabilities.Export || x.Name.StartsWith("memory.", StringComparison.Ordinal));
         Assert.Contains(manifest.Requires, x => x.Name == AgentLifecycleCapabilities.CompleteOnboarding);
         Assert.Contains(AgentLifecycleEvents.Onboarded, manifest.Events.Subscribes);
         Assert.Contains(PersonalTodoEvents.Available, manifest.Events.Subscribes);

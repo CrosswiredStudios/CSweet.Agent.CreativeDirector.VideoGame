@@ -362,10 +362,37 @@ public sealed class CreativeDirectorLifecycleTests
             incoming, Guid.NewGuid().ToString("D"), Guid.NewGuid().ToString("D"), Guid.NewGuid().ToString("D"));
 
         Assert.Equal(2, proposals.Count);
+        Assert.All(proposals, x => Assert.Equal("csweet", x.Partition.ApplicationId));
         Assert.Contains(proposals, x => x.Scope == MemoryScope.User && x.Sensitivity == MemorySensitivity.Personal);
         Assert.Contains(proposals, x => x.Scope == MemoryScope.Tenant && x.Sensitivity == MemorySensitivity.Internal);
         Assert.All(proposals, x => Assert.DoesNotContain("C:\\private", x.Content, StringComparison.OrdinalIgnoreCase));
         Assert.Contains(proposals, x => x.Content.Contains(new string('a', 64), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void MemoryRecallMatchesPlatformScopesWithoutReadingInstallationPrivateHistory()
+    {
+        var business = Guid.NewGuid().ToString("D");
+        var installation = Guid.NewGuid().ToString("D");
+        var employee = Guid.NewGuid().ToString("D");
+        var user = Guid.NewGuid().ToString("D");
+        var requests = VideoGameCreativeDirectorAgent.BuildMemoryRecallRequests(business, installation, employee, user);
+
+        Assert.Equal(new[] {
+            EmployeeMemoryNamespaces.UserRelationship(business, employee, user, "csweet").Partition,
+            EmployeeMemoryNamespaces.Employee(business, employee, "csweet").Partition,
+            EmployeeMemoryNamespaces.Organization(business, "csweet").Partition
+        }, requests.Select(x => x.Partition));
+        Assert.Equal(new[] { MemoryScope.User, MemoryScope.Agent, MemoryScope.Tenant }, requests.Select(x => x.Scope));
+        Assert.Equal(2_000, requests.Sum(x => x.TokenBudget));
+        Assert.All(requests, request => {
+            Assert.Equal(employee, request.Access!.Principal.EmployeeId);
+            Assert.NotEqual(installation, request.Partition.ApplicationId);
+        });
+        // Reinstallation changes attribution, never the employee/relationship storage audience.
+        var replacement = VideoGameCreativeDirectorAgent.BuildMemoryRecallRequests(business,
+            Guid.NewGuid().ToString("D"), employee, user);
+        Assert.Equal(requests.Select(x => x.Partition), replacement.Select(x => x.Partition));
     }
 
     [Fact]

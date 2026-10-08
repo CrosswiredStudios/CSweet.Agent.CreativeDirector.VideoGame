@@ -7,7 +7,8 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.15.0`
+- Version: `1.17.0`
+- Project approvals: `PresentProjectApprovalAsync` calls `platform.user-action.suggest.v1` with workflow `approval.review.v1` and the proposal ID. Communications renders Approve / More info / Deny; the host validates ownership, the private approver conversation, and current decision authority. Stable keys recover interrupted attachment without another proposal. The host must support this workflow and the capability must be granted during upgrade.
 - The Creative Director reviews direct-report planning decisions against the accepted brief, resolves delegated direction, and escalates material changes to the CEO.
 - Initial delivery team review: Technical Director, game engineer, and QA can be proposed together from the exact accepted brief; additional roles require scoped backlog evidence.
 - Provides: `creative-direction.game-vision.v1`
@@ -98,6 +99,21 @@ user/business memory, and supplied broker references. Explicit preferences and p
 may be proposed to governed memory immediately; inferred persona preferences are not persisted
 from a single observation and remain subject to platform approval.
 
+Memory uses the platform `csweet` application namespace for the current employee,
+that employee's relationship with the manager, and eligible organization memory.
+The 2,000 estimated content-token allowance is split across relationship (600), employee (400),
+and business (1,000) recall. This is not yet an invocation-wide rendered-token budget.
+Existing installation-private history stays separate and is not copied or read as shared memory.
+New organization proposals remain subject to the server's Personal sensitivity floor and cannot
+automatically become shared business evidence; trusted review remains a separate workflow.
+
+Version 1.16.0 requests the actual broker capabilities `platform.memory.query.v1` and
+`platform.memory.write.v1` instead of the unused legacy `memory.user.*` / `memory.business.*`
+declarations. Review and grant these capabilities when upgrading an installation; an old grant
+does not acquire them automatically. Manage and export are not requested. Deploy the matching
+platform memory hardening update and complete any reviewed canonical migration first.
+Missing grants or denied memory access continue to leave creative operating state usable.
+
 The installation settings **Maximum context-window tokens** (`maxContextWindowTokens`, default
 220,000) and **Maximum pitch output tokens** (`maxOutputTokens`, default 32,000) reserve a
 high-level game-vision response budget that includes model reasoning. Output must be less than
@@ -107,7 +123,7 @@ window; the selected model and provider remain authoritative limits. If the mode
 the whole output budget on reasoning and returns no pitch text, adjust these settings and retry
 the saved direction. Other Creative Director responses use the provider's normal output limit.
 
-Built with `CSweet.Agent.SDK` 3.59.0, `CSweet.Memory` 0.1.2.
+Built with `CSweet.Agent.SDK` 3.59.0, `CSweet.Memory` 0.2.0.
 
 
 ## Extension ownership and isolated builds
