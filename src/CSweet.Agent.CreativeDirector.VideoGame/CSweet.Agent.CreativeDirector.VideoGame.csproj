@@ -1,13 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <Version>1.17.0</Version>
+    <Version>1.17.3</Version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CSweet.Agent.SDK" Version="3.59.0" Condition="'$(UseLocalCSweetAgentSdk)' != 'true'" />
-    <PackageReference Include="CSweet.Memory" Version="0.2.0" Condition="'$(UseLocalCSweetMemory)' != 'true'" />
-    <PackageReference Include="CSweet.Memory.Broker" Version="0.2.0" Condition="'$(UseLocalCSweetMemory)' != 'true'" />
+    <PackageReference Include="CSweet.Memory" Version="0.3.0" Condition="'$(UseLocalCSweetMemory)' != 'true'" />
+    <PackageReference Include="CSweet.Memory.Broker" Version="0.3.0" Condition="'$(UseLocalCSweetMemory)' != 'true'" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="CSweet.Agent.CreativeDirector.VideoGame.Tests" />

@@ -34,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.17.0";
+    public override string Version => "1.17.3";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -342,6 +342,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
                 conversationId, context, cancellationToken);
             try
             {
+                await CheckProducerHandoffAsync(current.State, context, cancellationToken);
                 await ReconcileAsync(item.Id, context, cancellationToken, current.State, current.Revision);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -1657,6 +1658,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         revision = foundation.Revision;
         if (!foundation.Ready) return;
         state = state with { Phase = CreativeDirectorPhase.DetailedDesign };
+        await CheckProducerHandoffAsync(state, context, cancellationToken);
         if (state.HandoffSessionId is null)
         {
             var acceptedGdd = await context.Platform.Artifacts.GetAsync(state.HighLevelArtifactId!.Value, cancellationToken);

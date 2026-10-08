@@ -7,7 +7,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.17.0`
+- Version: `1.17.3`
 - Project approvals: `PresentProjectApprovalAsync` calls `platform.user-action.suggest.v1` with workflow `approval.review.v1` and the proposal ID. Communications renders Approve / More info / Deny; the host validates ownership, the private approver conversation, and current decision authority. Stable keys recover interrupted attachment without another proposal. The host must support this workflow and the capability must be granted during upgrade.
 - The Creative Director reviews direct-report planning decisions against the accepted brief, resolves delegated direction, and escalates material changes to the CEO.
 - Initial delivery team review: Technical Director, game engineer, and QA can be proposed together from the exact accepted brief; additional roles require scoped backlog evidence.
@@ -123,7 +123,7 @@ window; the selected model and provider remain authoritative limits. If the mode
 the whole output budget on reasoning and returns no pitch text, adjust these settings and retry
 the saved direction. Other Creative Director responses use the provider's normal output limit.
 
-Built with `CSweet.Agent.SDK` 3.59.0, `CSweet.Memory` 0.2.0.
+Built with `CSweet.Agent.SDK` 3.59.0, `CSweet.Memory` 0.3.0.
 
 
 ## Extension ownership and isolated builds
@@ -271,5 +271,12 @@ three consecutive failures of the same step. A Producer kickoff whose handoff ta
 answered with the next step instead of a failed turn; the review retries the same idempotent task.
 
 ## Hierarchical delivery
+
+Project reviews read the Producer collaboration's current status. Failed, blocked and cancelled
+handoffs are reported as such and use the ten-minute review and one-time escalation after three
+consecutive failures. With the updated host, eligible memory-reset execution failures resume the
+same session and unanswered speaker after confirmed runtime replacement, retaining questions and
+artifact revisions, with at most three total execution attempts for that unanswered turn. Managers
+can also review a failed turn and use **Retry collaboration** in Communications.
 
 The V2 assignment identifies Task, Story, Epic or Release scope. Tasks require an authorized sprint; aggregate reviews require an active delivery plan and do not invent sprint identities. Use the exact assigned branch, commit or artifact revision. Every task requires independent QA, including documents. Managers accept aggregate candidates using current evidence; task completion does not promote to main or authorize deployment.
