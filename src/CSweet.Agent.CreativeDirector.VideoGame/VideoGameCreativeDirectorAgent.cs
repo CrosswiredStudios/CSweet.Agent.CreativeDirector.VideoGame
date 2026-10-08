@@ -34,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.15.0";
+    public override string Version => "1.17.0";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -1147,7 +1147,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         }
     }
 
-    private async Task<string> RecallApprovedMemoryAsync(
+    internal async Task<string> RecallApprovedMemoryAsync(
         string userId,
         AgentRuntimeContext context,
         CancellationToken cancellationToken)
@@ -1157,26 +1157,42 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         try
         {
             var engine = CreateMemoryEngine(context);
-            var access = CreateMemoryAccess(context);
-            var user = await engine.RecallAsync(new MemoryRecallRequest(
-                EmployeeMemoryNamespaces.UserRelationship(
-                    context.BusinessId, context.Identity.EmployeeId, userId, context.InstallationId).Partition,
-                MemoryScope.User,
-                "manager involvement, interaction style, milestone review, collaboration, and creative approval preferences",
-                TokenBudget: 800,
-                Access: access), cancellationToken);
-            var business = await engine.RecallAsync(new MemoryRecallRequest(
-                EmployeeMemoryNamespaces.Organization(context.BusinessId, context.InstallationId).Partition,
-                MemoryScope.Tenant,
-                "video game project platforms, genre, narrative constraints, creative references, budget, and team decisions",
-                TokenBudget: 1_200,
-                Access: access), cancellationToken);
-            return $"User-scoped approved memory:\n{user.RenderedContext}\n\nBusiness/project-scoped approved memory:\n{business.RenderedContext}";
+            var sections = new List<string>();
+            foreach (var request in BuildMemoryRecallRequests(context.BusinessId, context.InstallationId,
+                         context.Identity.EmployeeId, userId))
+            {
+                var packet = await engine.RecallAsync(request, cancellationToken);
+                sections.Add($"{request.Scope}-scoped memory context:\n{packet.RenderedContext}");
+            }
+            return string.Join("\n\n", sections);
         }
         catch (Exception exception) when (exception is PlatformCapabilityException or UnauthorizedAccessException)
         {
             return "No approved memory was available.";
         }
+    }
+
+    // Match platform conversation capture without promoting or falling back to installation-private history.
+    private const string MemoryApplicationId = "csweet";
+
+    internal static IReadOnlyList<MemoryRecallRequest> BuildMemoryRecallRequests(
+        string businessId, string installationId, string employeeId, string userId)
+    {
+        var access = CreateMemoryAccess(businessId, installationId, employeeId);
+        return [
+            new(EmployeeMemoryNamespaces.UserRelationship(businessId, employeeId, userId, MemoryApplicationId).Partition,
+                MemoryScope.User,
+                "manager involvement, interaction style, milestone review, collaboration, and creative approval preferences",
+                TokenBudget: 600, Access: access),
+            new(EmployeeMemoryNamespaces.Employee(businessId, employeeId, MemoryApplicationId).Partition,
+                MemoryScope.Agent,
+                "creative direction, decisions, lessons, collaboration, and project constraints",
+                TokenBudget: 400, Access: access),
+            new(EmployeeMemoryNamespaces.Organization(businessId, MemoryApplicationId).Partition,
+                MemoryScope.Tenant,
+                "video game project platforms, genre, narrative constraints, creative references, budget, and team decisions",
+                TokenBudget: 1_000, Access: access)
+        ];
     }
 
     private async Task ProposeExplicitMemoriesAsync(
@@ -1233,7 +1249,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         {
             proposals.Add(new MemoryIngestRequest(
                 EmployeeMemoryNamespaces.UserRelationship(
-                    businessId, employeeId, incoming.UserId, installationId).Partition,
+                    businessId, employeeId, incoming.UserId, MemoryApplicationId).Partition,
                 MemoryScope.User,
                 JsonSerializer.Serialize(new
                 {
@@ -1259,7 +1275,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
             references.Count > 0)
         {
             proposals.Add(new MemoryIngestRequest(
-                EmployeeMemoryNamespaces.Organization(businessId, installationId).Partition,
+                EmployeeMemoryNamespaces.Organization(businessId, MemoryApplicationId).Partition,
                 MemoryScope.Tenant,
                 JsonSerializer.Serialize(new
                 {
@@ -2094,6 +2110,19 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
                Regex.IsMatch(after, @"(?i)^\s+(?:is\s+)?(?:not|unwanted|excluded|prohibited)\b");
     }
 
+    internal static async Task PresentProjectApprovalAsync(CreativeDirectorOperatingState state,
+        AgentRuntimeContext context, CancellationToken cancellationToken)
+    {
+        if (state.WorkstreamProposalId is not { } approvalId || state.AcceptedVision is null) return;
+        var title = state.WorkingTitle ?? ExtractWorkingTitle(state.AcceptedVision.Markdown);
+        var message = await context.Platform.Communication.SendMessageAsync(state.AcceptedVision.ConversationId,
+            $"{title} is ready for project setup. Review the proposed lead, milestones, and operating permissions below before production planning begins.",
+            $"workstream-approval-notice:{approvalId:N}", cancellationToken);
+        await context.Platform.SuggestUserActionAsync(new SuggestUserActionRequest(message.Id, null,
+            "approval.review.v1", "Review project", $"Create project: {title}",
+            JsonSerializer.SerializeToElement(new { approvalId }), $"workstream-approval-card:{approvalId:N}"), cancellationToken);
+    }
+
     internal async Task<(CreativeDirectorOperatingState State, long? Revision, bool Ready)> EnsureProjectFoundationAsync(
         CreativeDirectorOperatingState state,
         long? revision,
@@ -2128,7 +2157,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
             var now = DateTimeOffset.UtcNow;
             var proposal = await context.Platform.ProposeWorkstreamAsync(new WorkstreamPlanProposalV2Request(
                 workingTitle,
-                $"Deliver the accepted video-game vision {state.AcceptedVision.Digest} as a complete, validated, releasable game.",
+                $"Create {workingTitle} from the accepted creative brief, with a playable game and reviewed quality, accessibility, and release evidence.",
                 ["A runnable game fulfills the accepted player promise.", "Creative, technical, quality, accessibility, and release gates have accepted evidence.", "Public launch occurs only after explicit human approval."],
                 VideoGameLifecyclePhases.Concept,
                 producerId,
@@ -2139,7 +2168,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
                 null,
                 null,
                 null,
-                "Create the governed project aggregate, team boundary, lifecycle gates, evidence chain, and Creative Director supervision assignment for the accepted game vision.",
+                "Give the Producer a project to plan and deliver, connect the approved team and creative brief, and keep creative direction and major decisions under review.",
                 $"video-game-workstream:{state.AcceptedVision.Digest}",
                 VideoGameProfileKeys.ProductionV2,
                 6,
@@ -2162,16 +2191,14 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
             };
             var saved = await SaveStateAsync(state, revision, reviewId,
                 $"workstream-proposed:{state.AcceptedVision.Digest}", context, cancellationToken);
-            await context.Platform.Communication.SendMessageAsync(state.AcceptedVision.ConversationId,
-                "The Producer is hired. Project setup is awaiting approval before I can attach the accepted brief and start production planning. " +
-                $"[Review project setup](/organizations/{context.BusinessId}/approvals). " +
-                "After approval, the Producer will propose staffing to me for review, and the Chief of Staff will bring you the approved hiring suggestions.",
-                $"workstream-approval-notice:{proposal.ApprovalId:N}", cancellationToken);
+            await PresentProjectApprovalAsync(saved.State, context, cancellationToken);
             return (saved.State, saved.Revision, false);
         }
 
         if (!state.WorkstreamId.HasValue)
         {
+            // Recover a lost card attachment after the proposal/state save, using stable keys.
+            await PresentProjectApprovalAsync(state, context, cancellationToken);
             var portfolio = await context.Platform.ReadPortfolioAsync(new ReadPortfolioRequest(), cancellationToken);
             var match = portfolio.Workstreams.FirstOrDefault(x =>
                 x.Workstream.AccountableManagerOrganizationUserId == producerId &&
