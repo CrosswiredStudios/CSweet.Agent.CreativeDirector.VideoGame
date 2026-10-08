@@ -32,6 +32,17 @@ public sealed class DeliveryEscalationRelayTests
     }
 
     [Fact]
+    public void A_producer_access_refusal_is_relayed_too()
+    {
+        // Producer 2.18.2 wording when the platform denies it project delivery access.
+        const string access = "Prism Break delivery can't start: the platform denied me `work.delivery.read.v1`, so I can't staff, dispatch or " +
+            "recover its tickets. Nothing I retry can fix this, so it needs your decision.\n\nAdd me under Projects → Prism Break → Manage members. " +
+            "Once it's fixed you can reply `Retry staffing: <what changed>` to have me recheck now.";
+        Assert.True(DeliveryEscalationRelay.IsDeliveryEscalation(Incoming(), access, fromManager: false));
+        Assert.False(DeliveryEscalationRelay.IsDeliveryEscalation(Incoming(), "Reply `Retry staffing: done` when ready.", fromManager: false));
+    }
+
+    [Fact]
     public void Ordinary_messages_are_not_relayed()
     {
         Assert.False(DeliveryEscalationRelay.IsDeliveryEscalation(Incoming(), Escalation, fromManager: true));
