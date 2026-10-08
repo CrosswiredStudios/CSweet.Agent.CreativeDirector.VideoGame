@@ -11,7 +11,7 @@ namespace CSweet.Agent.CreativeDirector.VideoGame;
 /// </summary>
 internal static class DeliveryEscalationRelay
 {
-    private static readonly string[] Commands = ["`Retry ticket ", "`Amend ticket ", "`Replan ticket "];
+    private static readonly string[] Commands = ["`Retry ticket ", "`Amend ticket ", "`Replan ticket ", "`Retry staffing:"];
     private static readonly string[] Asks =
     [
         "needs your decision", "can't start", "has been blocked since", "has been marked failed since",
