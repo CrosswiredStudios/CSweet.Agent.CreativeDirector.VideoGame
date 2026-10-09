@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Security.Cryptography;
 using CSweet.Agent.SDK;
 using CSweet.WorkManagement.Contracts;
 using Microsoft.Extensions.AI;
@@ -27,7 +28,8 @@ public sealed partial class VideoGameCreativeDirectorAgent
     internal async Task ReviewAssignedProjectsAsync(AgentRuntimeContext context, CancellationToken token)
     {
         var reviews = await ReadProjectApprovalsAsync(null, context, token);
-        foreach (var review in reviews.Where(x => x.Status == "Pending" && x.ApproverId.ToString() == context.Identity?.EmployeeId))
+        if (!Guid.TryParse(context.Identity?.EmployeeId, out var actorId)) return;
+        foreach (var review in reviews.Where(x => x.Status == "Pending" && x.ApproverId == actorId))
             await ReviewProjectAsync(review, context, token);
     }
 
@@ -42,8 +44,11 @@ public sealed partial class VideoGameCreativeDirectorAgent
             var accepted = await context.Platform.Artifacts.ReadAcceptedAsync(new(reference.ResourceId, reference.RevisionId!.Value, reference.Digest!), token);
             evidence.Add(accepted.Revision.Content);
         }
+        var assessmentDigest = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new {
+            payloadHash = review.Binding.GetProperty("payloadHash").GetString(), review.Spending, review.Escalation
+        }, ProjectApprovalJson)));
         var result = await CrosswiredStudios.VideoGame.PitchCollaboration.PitchProtocol.CachedAsync(
-            $"project-review-model:{review.ProposalId:N}:{review.Binding.GetProperty("payloadHash").GetString()}", context, async () =>
+            $"project-review-model:{review.ProposalId:N}:{assessmentDigest}", context, async () =>
         {
         var provider = Settings.GetGuid("llmProviderId") ?? throw new InvalidOperationException("Configure the Creative Director model.");
         var model = context.CreateChatClient(new AgentLlmSelection(provider, Settings.GetString("llmModel"),
