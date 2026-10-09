@@ -7,7 +7,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.17.11`
+- Version: `1.18.0`
 - Project approvals: `PresentProjectApprovalAsync` calls `platform.user-action.suggest.v1` with workflow `approval.review.v1` and the proposal ID. Communications renders Approve / More info / Deny; the host validates ownership, the private approver conversation, and current decision authority. Stable keys recover interrupted attachment without another proposal. The host must support this workflow and the capability must be granted during upgrade.
 - The Creative Director reviews direct-report planning decisions against the accepted brief, resolves delegated direction, and escalates material changes to the CEO.
 - Initial delivery team review: Technical Director, game engineer, and QA can be proposed together from the exact accepted brief; additional roles require scoped backlog evidence.
@@ -280,3 +280,7 @@ artifact revisions, with at most three total execution attempts for that unanswe
 can also review a failed turn and use **Retry collaboration** in Communications.
 
 The V2 assignment identifies Task, Story, Epic or Release scope. Tasks require an authorized sprint; aggregate reviews require an active delivery plan and do not invent sprint identities. Use the exact assigned branch, commit or artifact revision. Every task requires independent QA, including documents. Managers accept aggregate candidates using current evidence; task completion does not promote to main or authorize deployment.
+
+## Project approval authority
+
+The Director initiates project setup through the Producer, reviews the stored proposal and accepted evidence, and approves within delegated responsibility. Revisions return to the Producer; exceptions are durably routed to the Director's reporting manager. `platform.project-approval.read.v1` and `platform.project-approval.decide.v1` require reviewed grants. Requested/decided events are wake hints; attention recovery re-reads pending proposals. `maximumProjectBudget` defaults to zero (unlimited); a positive limit requires a matching `projectBudgetCurrency` and proposed amount. Legal commitments, material strategy changes, publication and launch remain reserved decisions. Pending older Director-authored requests are withdrawn and replaced after upgrade.

@@ -134,8 +134,9 @@ public sealed class ProductionCommitmentTests
         WorkstreamPlanProposalV2Request? plan = null;
         DecisionRequest? decision = null;
         var runtime = new AgentTestRuntime()
-            .RegisterCapability<WorkstreamPlanProposalV2Request, JsonElement>("platform.workstream.plan.propose.v2", (r, _) => {
-                plan = r; return Task.FromException<JsonElement>(new InvalidOperationException("captured")); })
+            .RegisterCapability<StartAgentCoordinationRequest, JsonElement>(CommunicationCapabilities.CoordinationStart, (r, _) => {
+                plan = r.Artifact!.Payload.Deserialize<WorkstreamPlanProposalV2Request>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                return Task.FromException<JsonElement>(new InvalidOperationException("captured")); })
             .RegisterCapability<DecisionRequest, DecisionRecord>(DecisionCapabilityNames.RequestV1, (r, _) => {
                 decision = r; return Task.FromException<DecisionRecord>(new InvalidOperationException("captured")); });
         var context = runtime.CreateContext(identity: new AgentIdentity(Guid.NewGuid().ToString(), "Director", null, "Creative Director", null, [], null, Guid.NewGuid().ToString(), "Owner"));

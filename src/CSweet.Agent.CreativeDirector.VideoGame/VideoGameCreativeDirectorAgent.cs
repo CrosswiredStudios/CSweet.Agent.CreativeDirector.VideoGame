@@ -34,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.17.11";
+    public override string Version => "1.18.0";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -49,13 +49,26 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
             description: "Budget for one high-level game vision response, including model reasoning. Set this within the selected model and provider's supported limits.",
             minimum: MinimumPitchOutputTokens, step: 1_000,
             defaultValue: DefaultPitchOutputTokens,
-            lessThanFieldKey: "maxContextWindowTokens");
+            lessThanFieldKey: "maxContextWindowTokens")
+        .Number("maximumProjectBudget", "Delegated project budget limit", required: false,
+            description: "Zero means unlimited while real-money spending is unavailable. Positive limits require a matching project currency and amount.", minimum: 0, defaultValue: 0)
+        .Text("projectBudgetCurrency", "Project budget currency", required: false, defaultValue: "USD");
 
     protected override async Task HandleManagerEventAsync(
         AgentEventEnvelope message,
         AgentRuntimeContext context,
         CancellationToken cancellationToken)
     {
+        if (message.EventType == "com.csweet.project-approval.decided.v1")
+        {
+            await ReconcilePortfolioAsync(message.EventId, context, cancellationToken);
+            return;
+        }
+        if (message.EventType == "com.csweet.project-approval.requested.v1")
+        {
+            await ReviewAssignedProjectsAsync(context, cancellationToken);
+            return;
+        }
         if (string.Equals(message.EventType, AgentLifecycleEvents.Onboarded, StringComparison.Ordinal))
         {
             await HandleOnboardedAsync(message, context, cancellationToken);
@@ -420,6 +433,8 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         AgentRuntimeContext context,
         CancellationToken cancellationToken)
     {
+        if (request.Transcript.Any(x => x.Artifact?.Type == "video-game.project-foundation.request.v1"))
+            return await ReviewProjectFoundationAsync(request, context, cancellationToken);
         var current = await ReadStateForCoordinationAsync(request, context, cancellationToken);
         var latestArtifact = request.Transcript.LastOrDefault(x => x.Artifact is not null)?.Artifact;
         if (latestArtifact?.Type == CrosswiredStudios.VideoGame.PitchCollaboration.PitchProtocol.ReviewType)
@@ -1526,6 +1541,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         long? suppliedRevision = null,
         bool allowStaffingProposal = false)
     {
+        await ReviewAssignedProjectsAsync(context, cancellationToken);
         var current = suppliedState is null
             ? await ReadStateAsync(context, cancellationToken)
             : (suppliedState, suppliedRevision);
@@ -2151,6 +2167,19 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
             throw new InvalidOperationException("The Creative Director employee identity is unavailable.");
 
         var workingTitle = state.WorkingTitle ?? ExtractWorkingTitle(state.AcceptedVision.Markdown);
+        if (state.WorkstreamProposalId is { } legacyId && !state.WorkstreamProposalSessionId.HasValue && !state.WorkstreamId.HasValue)
+        {
+            var legacy = (await ReadProjectApprovalsAsync(legacyId, context, cancellationToken)).SingleOrDefault();
+            if (legacy is { Status: "Pending" } && legacy.RequesterId == creativeDirectorId)
+            {
+                await context.Platform.InvokeAsync<object, JsonElement>("platform.project-approval.decide.v1", new {
+                    proposalId = legacyId, decisionKind = "Withdraw", comment = "Replaced by a Producer-authored proposal for reporting-manager review.",
+                    payloadHash = legacy.Binding.GetProperty("payloadHash").GetString(), actionIdempotencyKey = legacy.Binding.GetProperty("idempotencyKey").GetString(),
+                    decisionIdempotencyKey = $"project-foundation-withdraw:{legacyId:N}"
+                }, cancellationToken);
+                state = state with { WorkstreamProposalId = null };
+            }
+        }
         if (!state.WorkstreamProposalId.HasValue && !state.WorkstreamId.HasValue)
         {
             var metadata = new VideoGameProjectMetadataV1(
@@ -2168,7 +2197,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
                 ["Remappable controls", "Readable presentation", "Adjustable challenge and assistance"],
                 []);
             var now = DateTimeOffset.UtcNow;
-            var proposal = await context.Platform.ProposeWorkstreamAsync(new WorkstreamPlanProposalV2Request(
+            var projectPlan = new WorkstreamPlanProposalV2Request(
                 workingTitle,
                 $"Create {workingTitle} from the accepted creative brief, with a playable game and reviewed quality, accessibility, and release evidence.",
                 ["A runnable game fulfills the accepted player promise.", "Creative, technical, quality, accessibility, and release gates have accepted evidence.", "Public launch occurs only after explicit human approval."],
@@ -2195,23 +2224,31 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
                 BuildLifecycleMilestones(now),
                 [new EvidenceReference("artifact", state.AcceptedVision.ArtifactId,
                     state.AcceptedVision.ArtifactRevisionId, state.AcceptedVision.ArtifactRevisionHash,
-                    VideoGameArtifactTypeKeys.Vision, "Accepted")]), cancellationToken);
+                    VideoGameArtifactTypeKeys.Vision, "Accepted")]);
+            var projectSession = await context.Platform.Communication.StartCoordinationAsync(new StartAgentCoordinationRequest(
+                producerId, "Propose the accepted game project", "Prepare a project proposal from the accepted direction for manager review.",
+                ["An exact project proposal is reviewed by its assigned manager"],
+                "Analyze the project template and accepted evidence. Submit the project proposal as Producer and return its approval ID for my review.",
+                state.AcceptedVision.ConversationId, state.AcceptedVision.ChatTurnId, state.AcceptedVision.MessageId,
+                $"project-foundation:{state.AcceptedVision.Digest}",
+                CollaborationActions.WithDocuments(new AgentCoordinationArtifactSubmission("video-game.project-foundation.request.v1", "1.0", state.AcceptedVision.Digest, 1, true,
+                    ProjectFoundationPayload(projectPlan, state.AcceptedVision.ConversationId)), projectPlan.InitialEvidence.Where(x => x.Kind == "artifact").Select(x => new CollaborationDocumentReference(x.ResourceId, x.RevisionId!.Value, x.Digest!)).ToArray())), cancellationToken);
             state = state with
             {
                 WorkingTitle = workingTitle,
-                WorkstreamProposalId = proposal.ApprovalId,
+                WorkstreamProposalSessionId = projectSession.Id,
                 Phase = CreativeDirectorPhase.WorkstreamPlanPending
             };
             var saved = await SaveStateAsync(state, revision, reviewId,
                 $"workstream-proposed:{state.AcceptedVision.Digest}", context, cancellationToken);
-            await PresentProjectApprovalAsync(saved.State, context, cancellationToken);
+
             return (saved.State, saved.Revision, false);
         }
 
         if (!state.WorkstreamId.HasValue)
         {
-            // Recover a lost card attachment after the proposal/state save, using stable keys.
-            await PresentProjectApprovalAsync(state, context, cancellationToken);
+            // Creation is authoritative only after the approved project appears in the portfolio.
+
             var portfolio = await context.Platform.ReadPortfolioAsync(new ReadPortfolioRequest(), cancellationToken);
             var match = portfolio.Workstreams.FirstOrDefault(x =>
                 x.Workstream.AccountableManagerOrganizationUserId == producerId &&
@@ -2827,6 +2864,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
             ToolchainFeasibilitySessionId = desired.ToolchainFeasibilitySessionId ?? latest.ToolchainFeasibilitySessionId,
             ToolchainFeasibilityEvidence = desired.ToolchainFeasibilityEvidence ?? latest.ToolchainFeasibilityEvidence,
             WorkstreamProposalId = desired.WorkstreamProposalId ?? latest.WorkstreamProposalId,
+            WorkstreamProposalSessionId = desired.WorkstreamProposalSessionId ?? latest.WorkstreamProposalSessionId,
             WorkingTitle = desired.WorkingTitle ?? latest.WorkingTitle,
             HandoffSessionId = desired.HandoffSessionId ?? latest.HandoffSessionId,
             DiscoveryInputs = latest.DiscoveryInputs.Concat(desired.DiscoveryInputs).Distinct(StringComparer.OrdinalIgnoreCase).TakeLast(40).ToList(),

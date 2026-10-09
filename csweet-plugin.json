@@ -16,7 +16,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "Naomi Chen",
-  "version": "1.17.11",
+  "version": "1.18.0",
   "publisher": {
     "id": "com.csweet",
     "name": "C-Sweet"
@@ -756,6 +756,16 @@
       "name": "platform.management.incident.forward.v1",
       "scope": "organization",
       "purpose": "Inspect assigned project incidents and escalate through the authorized reporting hierarchy."
+    },
+    {
+      "name": "platform.project-approval.read.v1",
+      "scope": "organization",
+      "purpose": "Read current assigned or submitted project proposals, review outcomes and spending authority."
+    },
+    {
+      "name": "platform.project-approval.decide.v1",
+      "scope": "organization",
+      "purpose": "Review subordinate project proposals; approve, request revision, reject or escalate to the reporting manager."
     }
   ],
   "events": {
@@ -795,7 +805,9 @@
       "com.csweet.media-job.completed.v1",
       "com.csweet.release-readiness.changed.v1",
       "com.csweet.project-health.review-due.v1",
-      "com.csweet.management.incident.changed.v1"
+      "com.csweet.management.incident.changed.v1",
+      "com.csweet.project-approval.requested.v1",
+      "com.csweet.project-approval.decided.v1"
     ]
   },
   "configuration": [
@@ -838,6 +850,22 @@
       "step": 1000,
       "defaultValue": 128000,
       "lessThanFieldKey": "maxContextWindowTokens"
+    },
+    {
+      "key": "maximumProjectBudget",
+      "label": "Delegated project budget limit",
+      "type": "number",
+      "required": false,
+      "defaultValue": 0,
+      "minimum": 0,
+      "description": "Zero means unlimited while real-money spending is unavailable. Positive limits require a matching project currency and amount."
+    },
+    {
+      "key": "projectBudgetCurrency",
+      "label": "Project budget currency",
+      "type": "text",
+      "required": false,
+      "defaultValue": "USD"
     }
   ],
   "credentials": [],

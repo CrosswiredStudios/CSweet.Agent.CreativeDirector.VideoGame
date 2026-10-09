@@ -10,7 +10,8 @@ public sealed class CreativeDirectorInteractionTests
     [Fact]
     public async Task ModelStreamingPublishesReasoningAndDraftToTheConversationTurn()
     {
-        var runtime = new AgentTestRuntime();
+        var runtime = new AgentTestRuntime().RegisterCapability<JsonElement, JsonElement>("platform.project-approval.read.v1",
+                (_, _) => Task.FromResult(JsonSerializer.SerializeToElement(Array.Empty<object>())));
         var turnId = Guid.NewGuid();
         string response;
 
@@ -108,7 +109,8 @@ public sealed class CreativeDirectorInteractionTests
                 stateKey, workstreamId, conversationId, null, null, "Accepted game",
                 CreativeDirectorPhase.HighLevelAccepted, DateTimeOffset.UtcNow)]
         };
-        var runtime = new AgentTestRuntime()
+        var runtime = new AgentTestRuntime().RegisterCapability<JsonElement, JsonElement>("platform.project-approval.read.v1",
+                (_, _) => Task.FromResult(JsonSerializer.SerializeToElement(Array.Empty<object>())))
             .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(
                 PlatformCapabilities.AgentOperatingStateRead,
                 (request, _) => Task.FromResult(new AgentOperatingStateReadResponse(
@@ -135,7 +137,8 @@ public sealed class CreativeDirectorInteractionTests
     [Fact]
     public async Task UnknownPersonalCardIsBlockedWithActionableReason()
     {
-        var context = new AgentTestRuntime().CreateContext();
+        var context = new AgentTestRuntime().RegisterCapability<JsonElement, JsonElement>("platform.project-approval.read.v1",
+                (_, _) => Task.FromResult(JsonSerializer.SerializeToElement(Array.Empty<object>()))).CreateContext();
         var item = PersonalItem("Unknown", "unknown.v1", Guid.NewGuid());
 
         var result = await new VideoGameCreativeDirectorAgent().HandlePersonalTodoAsync(
@@ -167,7 +170,8 @@ public sealed class CreativeDirectorInteractionTests
         AddPersonalTodoItemRequest? captured = null;
         PersonalTodoItem? legacyCard = null;
         var requeued = 0;
-        var runtime = new AgentTestRuntime()
+        var runtime = new AgentTestRuntime().RegisterCapability<JsonElement, JsonElement>("platform.project-approval.read.v1",
+                (_, _) => Task.FromResult(JsonSerializer.SerializeToElement(Array.Empty<object>())))
             .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(
                 PlatformCapabilities.AgentOperatingStateRead,
                 (request, _) => Task.FromResult(new AgentOperatingStateReadResponse(
@@ -246,7 +250,8 @@ public sealed class CreativeDirectorInteractionTests
     [Fact]
     public async Task PitchWorkAcknowledgementImmediatelySetsHumanExpectations()
     {
-        var runtime = new AgentTestRuntime();
+        var runtime = new AgentTestRuntime().RegisterCapability<JsonElement, JsonElement>("platform.project-approval.read.v1",
+                (_, _) => Task.FromResult(JsonSerializer.SerializeToElement(Array.Empty<object>())));
         await using var stream = runtime.CreateContext().CreateTurnStream(
             Guid.NewGuid().ToString("D"), Guid.NewGuid());
 
@@ -300,7 +305,8 @@ public sealed class CreativeDirectorInteractionTests
                 VideoGameCreativeDirectorAgent.PortfolioStateKey, portfolio)
         };
         ResourceChangeProposalRequest? proposal = null;
-        var runtime = new AgentTestRuntime()
+        var runtime = new AgentTestRuntime().RegisterCapability<JsonElement, JsonElement>("platform.project-approval.read.v1",
+                (_, _) => Task.FromResult(JsonSerializer.SerializeToElement(Array.Empty<object>())))
             .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(
                 PlatformCapabilities.AgentOperatingStateRead,
                 (request, _) => Task.FromResult(new AgentOperatingStateReadResponse(
@@ -405,7 +411,8 @@ public sealed class CreativeDirectorInteractionTests
         var requeues = new List<RequeuePersonalTodoItemRequest>();
         AddPersonalTodoItemRequest? staffingTodoRequest = null;
         PersonalTodoItem? staffingTodo = null;
-        var runtime = new AgentTestRuntime()
+        var runtime = new AgentTestRuntime().RegisterCapability<JsonElement, JsonElement>("platform.project-approval.read.v1",
+                (_, _) => Task.FromResult(JsonSerializer.SerializeToElement(Array.Empty<object>())))
             .RegisterCapability<JsonElement, PersonalTodoDirectory>(PersonalTodoCapabilities.Read,
                 (_, _) => Task.FromResult(new PersonalTodoDirectory(
                     [new PersonalTodoBoard(reviewTodo.BoardId, reviewTodo.OwnerOrganizationUserId,

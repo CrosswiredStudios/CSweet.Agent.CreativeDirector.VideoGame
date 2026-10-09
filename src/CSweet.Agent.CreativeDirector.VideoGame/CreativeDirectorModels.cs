@@ -115,6 +115,7 @@ public sealed record CreativeDirectorOperatingState
     public IReadOnlyDictionary<string, Guid> SpecialistEmployeeIds { get; init; } =
         new Dictionary<string, Guid>(StringComparer.Ordinal);
     public Guid? WorkstreamProposalId { get; init; }
+    public Guid? WorkstreamProposalSessionId { get; init; }
     public string? WorkingTitle { get; init; }
     public Guid? HandoffSessionId { get; init; }
     public Guid? AssetStrategyDecisionId { get; init; }
