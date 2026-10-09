@@ -22,8 +22,8 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     public const string VisionAcknowledgementArtifactType = "video-game.production.game-vision-acknowledgement.v1";
     public const string ToolchainFeasibilityArtifactType = "video-game.toolchain-feasibility.v1";
     private const string StateSchema = "com.csweet.video-game-creative-director.operating-state.v1";
-    internal const int DefaultPitchContextWindowTokens = 220_000;
-    internal const int DefaultPitchOutputTokens = 32_000;
+    internal const int DefaultPitchContextWindowTokens = 256_000;
+    internal const int DefaultPitchOutputTokens = 128_000;
     internal const int MinimumPitchOutputTokens = 2_048;
     private const string EnginePitchConflictError = "The configured model did not preserve the specified game engine.";
     private static readonly IReadOnlyList<AskUserOption> InvolvementOptions =
@@ -34,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.17.5";
+    public override string Version => "1.17.6";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,

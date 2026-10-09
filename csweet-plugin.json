@@ -16,7 +16,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "Naomi Chen",
-  "version": "1.17.5",
+  "version": "1.17.6",
   "publisher": {
     "id": "com.csweet",
     "name": "C-Sweet"
@@ -825,7 +825,7 @@
       "description": "Planning ceiling for high-level game vision generation; set this no higher than the selected model's real context window.",
       "minimum": 32769,
       "step": 1000,
-      "defaultValue": 220000
+      "defaultValue": 256000
     },
     {
       "key": "maxOutputTokens",
@@ -836,7 +836,7 @@
       "description": "Budget for one high-level game vision response, including model reasoning. Set this within the selected model and provider's supported limits.",
       "minimum": 2048,
       "step": 1000,
-      "defaultValue": 32000,
+      "defaultValue": 128000,
       "lessThanFieldKey": "maxContextWindowTokens"
     }
   ],

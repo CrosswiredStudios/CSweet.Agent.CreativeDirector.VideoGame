@@ -7,7 +7,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.17.5`
+- Version: `1.17.6`
 - Project approvals: `PresentProjectApprovalAsync` calls `platform.user-action.suggest.v1` with workflow `approval.review.v1` and the proposal ID. Communications renders Approve / More info / Deny; the host validates ownership, the private approver conversation, and current decision authority. Stable keys recover interrupted attachment without another proposal. The host must support this workflow and the capability must be granted during upgrade.
 - The Creative Director reviews direct-report planning decisions against the accepted brief, resolves delegated direction, and escalates material changes to the CEO.
 - Initial delivery team review: Technical Director, game engineer, and QA can be proposed together from the exact accepted brief; additional roles require scoped backlog evidence.
@@ -115,7 +115,7 @@ platform memory hardening update and complete any reviewed canonical migration f
 Missing grants or denied memory access continue to leave creative operating state usable.
 
 The installation settings **Maximum context-window tokens** (`maxContextWindowTokens`, default
-220,000) and **Maximum pitch output tokens** (`maxOutputTokens`, default 32,000) reserve a
+256,000) and **Maximum pitch output tokens** (`maxOutputTokens`, default 128,000) reserve a
 high-level game-vision response budget that includes model reasoning. Output must be less than
 context. The agent does not impose a fixed maximum on either setting, so they can match the selected
 model. The context setting is a planning ceiling, not a way to enlarge the model's actual context

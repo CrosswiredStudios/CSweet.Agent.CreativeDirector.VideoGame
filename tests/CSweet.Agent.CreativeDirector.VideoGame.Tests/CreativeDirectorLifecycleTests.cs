@@ -220,7 +220,7 @@ public sealed class CreativeDirectorLifecycleTests
     [Fact]
     public void PitchOutputBudgetUsesConfiguredValueAndStaysBelowContextWindow()
     {
-        Assert.Equal(32_000, VideoGameCreativeDirectorAgent.ResolvePitchOutputTokens(
+        Assert.Equal(128_000, VideoGameCreativeDirectorAgent.ResolvePitchOutputTokens(
             new AgentSettings(new Dictionary<string, JsonElement>())));
         Assert.Equal(128_000, VideoGameCreativeDirectorAgent.ResolvePitchOutputTokens(
             new AgentSettings(new Dictionary<string, JsonElement>
