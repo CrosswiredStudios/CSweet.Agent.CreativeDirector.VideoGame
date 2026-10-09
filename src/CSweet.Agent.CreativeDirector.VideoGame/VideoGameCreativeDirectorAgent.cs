@@ -34,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.18.0";
+    public override string Version => "1.18.1";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -1631,23 +1631,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         {
             var missingKey = string.Join('|', missingRoles.Select(x => x.RoleKey).Order(StringComparer.Ordinal));
             var fingerprint = Digest($"{resource.Id:N}:{approvedTeamId:N}:{missingKey}");
-            var existing = await context.Platform.ReadStaffingReplenishmentsAsync(
-                new StaffingReplenishmentReadRequest(SourceResourceChangeRequestId: resource.Id), cancellationToken);
-            if (!existing.Requests.Any(x => string.Equals(x.DecisionFingerprint, fingerprint, StringComparison.OrdinalIgnoreCase) &&
-                                           x.Status is StaffingReplenishmentStatuses.Pending or StaffingReplenishmentStatuses.Approved))
-            {
-                _ = await context.Platform.ProposeStaffingReplenishmentAsync(new StaffingReplenishmentProposalRequest(
-                    resource.Id,
-                    approvedTeamId,
-                    acceptedVision.ConversationId,
-                    missingRoles.Select(role => new StaffingReplenishmentGap(
-                        role.RoleKey, role.Title, 1, 0, 1,
-                        ["The approved project role has no distinct active eligible installation on this team."])).ToList(),
-                    "Producer-led planning is waiting for its approved Producer installation. Missing delivery specialists block only their dependent work.",
-                    ["No required specialist may absorb another required role; the Creative Director remains a supervisor rather than a delivery-team member."],
-                    fingerprint,
-                    $"video-game-studio-replenishment:{fingerprint}"), cancellationToken);
-            }
+            await EnsureStaffingReplacementAsync(current.Item1, resource, missingRoles, context, cancellationToken);
             await SaveStateAsync(state, revision, reviewId,
                 $"await-studio:{resource.Id:N}:{fingerprint}", context, cancellationToken);
             return;
@@ -2167,6 +2151,46 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
             throw new InvalidOperationException("The Creative Director employee identity is unavailable.");
 
         var workingTitle = state.WorkingTitle ?? ExtractWorkingTitle(state.AcceptedVision.Markdown);
+        if (!state.WorkstreamId.HasValue && state.WorkstreamProposalSessionId is { } sessionId)
+        {
+            var session = await context.Platform.Communication.ReadCoordinationAsync(sessionId, cancellationToken);
+            // A response failure can follow an already committed approval. Recover that exact
+            // project before treating the collaboration status as a reason to stop delivery.
+            if (session.Status is "Failed" or "Blocked" or "Cancelled" && state.WorkstreamProposalId is { } committedProposalId)
+            {
+                var approval = (await ReadProjectApprovalsAsync(committedProposalId, context, cancellationToken)).SingleOrDefault();
+                if (approval?.RequesterId == producerId && approval.Decision is { Decision: "Approve", ProjectId: { } createdId })
+                {
+                    var portfolio = await context.Platform.ReadPortfolioAsync(new ReadPortfolioRequest([createdId]), cancellationToken);
+                    var created = portfolio.Workstreams.SingleOrDefault(x => x.Workstream.Id == createdId &&
+                        x.Workstream.AccountableManagerOrganizationUserId == producerId && x.ActiveTeam?.TeamId == teamId);
+                    if (created is not null)
+                    {
+                        var recovered = await SaveStateAsync(state with { WorkstreamId = createdId, TeamId = teamId,
+                            WorkingTitle = created.Workstream.Name, Phase = CreativeDirectorPhase.ProjectSetup }, null,
+                            reviewId, $"workstream-state:{createdId:N}", context, cancellationToken);
+                        return (recovered.State, recovered.Revision, true);
+                    }
+                }
+            }
+            RequireProgressingHandoff(session, "Project proposal");
+            if (!state.WorkstreamProposalId.HasValue)
+            {
+                var submitted = session.Turns.LastOrDefault(x => x.SpeakerOrganizationUserId == producerId &&
+                    x.Artifact?.Type == "video-game.project-foundation.proposal.v1")?.Artifact;
+                if (submitted?.Payload.TryGetProperty("proposalId", out var proposal) == true &&
+                    proposal.ValueKind == JsonValueKind.String && proposal.TryGetGuid(out var proposalId))
+                {
+                    var recovered = await SaveStateAsync(state with { WorkstreamProposalId = proposalId }, revision,
+                        reviewId, $"project-foundation-proposal:{proposalId:N}", context, cancellationToken);
+                    state = recovered.State;
+                    revision = recovered.Revision;
+                }
+                else if (session.Status == "Completed")
+                    throw new InvalidOperationException("The Producer project-proposal collaboration completed without a proposal ID. Manager review is required.");
+                else return (state, revision, false);
+            }
+        }
         if (state.WorkstreamProposalId is { } legacyId && !state.WorkstreamProposalSessionId.HasValue && !state.WorkstreamId.HasValue)
         {
             var legacy = (await ReadProjectApprovalsAsync(legacyId, context, cancellationToken)).SingleOrDefault();
@@ -2241,7 +2265,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
             };
             var saved = await SaveStateAsync(state, revision, reviewId,
                 $"workstream-proposed:{state.AcceptedVision.Digest}", context, cancellationToken);
-
+            RequireProgressingHandoff(projectSession, "Project proposal");
             return (saved.State, saved.Revision, false);
         }
 
@@ -2257,6 +2281,12 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
                 string.Equals(x.Workstream.Name, workingTitle, StringComparison.OrdinalIgnoreCase));
             if (match is null)
             {
+                if (state.WorkstreamProposalId is { } proposalId)
+                {
+                    var review = (await ReadProjectApprovalsAsync(proposalId, context, cancellationToken)).SingleOrDefault();
+                    if (review is null || review.Decision?.Decision is "Reject" or "Withdraw")
+                        throw new InvalidOperationException("The project proposal is unavailable, rejected or withdrawn. Manager review is required before delivery can continue.");
+                }
                 var waiting = await SaveStateAsync(state with { Phase = CreativeDirectorPhase.WorkstreamPlanPending },
                     revision, reviewId, $"await-workstream:{state.WorkstreamProposalId:N}", context, cancellationToken);
                 return (waiting.State, waiting.Revision, false);

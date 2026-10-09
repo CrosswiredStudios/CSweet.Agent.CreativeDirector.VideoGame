@@ -23,7 +23,11 @@ internal static class CreativeDirectorNextStep
             : "the staffing plan is approved and the Producer is hired",
         CreativeDirectorPhase.WorkstreamPlanPending or CreativeDirectorPhase.ProjectSetup => state.ProducerEmployeeId is null
             ? "the approved Producer becomes active on the team"
-            : "I share the accepted pitch and high-level GDD with the Producer and set up the project",
+            : state.WorkstreamProposalId.HasValue
+                ? "I review the Producer's project proposal and confirm the approved project exists"
+                : state.WorkstreamProposalSessionId.HasValue
+                    ? "the Producer submits a valid project proposal for my review; I check the collaboration for blockers"
+                    : "I share the accepted pitch and high-level GDD with the Producer and start the project proposal",
         CreativeDirectorPhase.DetailedDesign => state.HandoffSessionId is null
             ? "I start the production-brief session with the Producer"
             : "the Producer and I converge on the shared production brief",

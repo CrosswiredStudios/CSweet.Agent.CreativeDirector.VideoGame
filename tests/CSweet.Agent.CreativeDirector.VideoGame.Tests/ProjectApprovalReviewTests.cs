@@ -7,6 +7,33 @@ namespace CSweet.Agent.CreativeDirector.VideoGame.Tests;
 public sealed class ProjectApprovalReviewTests
 {
     [Theory]
+    [InlineData(true, "Blocked")]
+    [InlineData(false, "Continue")]
+    public async Task ProducerBlockerIsPreservedAndAnExplicitResumeCanRetry(bool finalization, string expected)
+    {
+        var manager = Guid.NewGuid(); var producer = Guid.NewGuid(); var conversation = Guid.NewGuid();
+        var state = new CreativeDirectorOperatingState { ProducerEmployeeId = producer, IntakeConversationId = conversation,
+            AcceptedVision = new(1, "vision", "# Game", Guid.NewGuid(), Guid.NewGuid(), "hash", conversation,
+                Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow) };
+        var key = VideoGameCreativeDirectorAgent.ProjectStateKey(null, conversation);
+        var runtime = new AgentTestRuntime().RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(
+            PlatformCapabilities.AgentOperatingStateRead, (r, _) => Task.FromResult(new AgentOperatingStateReadResponse(
+                r.StateKey == key ? new(Guid.NewGuid(), key, "test", 1, "Active", new Dictionary<string, string>(), [], key, [],
+                    Guid.NewGuid(), JsonSerializer.SerializeToElement(state), 1, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow) : null)));
+        var context = runtime.CreateContext(identity: new(manager.ToString(), "Director", null, "Director", null, [], null, null, null));
+        var request = new AgentCoordinationTurnRequest(Guid.NewGuid(), 3, 2, "Project", "Create", [],
+            new(manager, Guid.NewGuid(), "Director", "Initiator"), new(producer, Guid.NewGuid(), "Producer", "Target"), finalization,
+            [new(Guid.NewGuid(), 0, manager, "Continue", "Prepare proposal", DateTimeOffset.UtcNow,
+                new("video-game.project-foundation.request.v1", "1.0", "vision", 1, true,
+                    JsonSerializer.SerializeToElement(new { sourceConversationId = conversation }), "digest")),
+             new(Guid.NewGuid(), 1, producer, "Blocked", "The outcome was invalid after one correction attempt.", DateTimeOffset.UtcNow)]);
+        var result = await new VideoGameCreativeDirectorAgent().HandleCoordinationTurnAsync(request, context, default);
+        Assert.Equal(expected, result.Disposition);
+        if (finalization) Assert.Contains("outcome was invalid", result.Content);
+        else Assert.Contains("Retry the project proposal", result.Content);
+    }
+
+    [Theory]
     [InlineData("Approve")]
     [InlineData("RequestRevision")]
     [InlineData("Escalate")]

@@ -7,6 +7,55 @@ namespace CSweet.Agent.CreativeDirector.VideoGame.Tests;
 public sealed class StaffingEventTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OnlyLostCapacityRequestsReplacementAndRepeatedWakesReuseIt(bool previouslyStaffed)
+    {
+        var team = Guid.NewGuid(); var source = Guid.NewGuid(); var director = Guid.NewGuid();
+        var resource = JsonSerializer.Deserialize<ResourceChangeRequestResponse>(JsonSerializer.Serialize(new {
+            id = source, teamId = team, status = "Approved" }), new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        var state = new CreativeDirectorOperatingState { TeamId = team, StaffingRequestId = source,
+            ProducerEmployeeId = previouslyStaffed ? Guid.NewGuid() : null,
+            AcceptedVision = new(1, "vision", "# Game", Guid.NewGuid(), Guid.NewGuid(), "hash", Guid.NewGuid(),
+                Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow) };
+        StaffingReplenishmentResponse? saved = null; var submissions = 0;
+        var runtime = new AgentTestRuntime();
+        if (previouslyStaffed)
+        {
+            runtime.RegisterCapability<StaffingReplenishmentReadRequest, StaffingReplenishmentReadResponse>(
+                "platform.management.staffing-replenishment.read.v1", (_, _) => Task.FromResult(new StaffingReplenishmentReadResponse(saved is null ? [] : [saved])))
+                .RegisterCapability<StaffingReplenishmentProposalRequest, StaffingReplenishmentResponse>(
+                    "platform.management.staffing-replenishment.propose.v1", (r, _) => {
+                        submissions++;
+                        Assert.Equal(source, r.SourceResourceChangeRequestId);
+                        Assert.Equal(VideoGameRoleKeys.Producer, Assert.Single(r.Gaps).RoleKey);
+                        saved = new(Guid.NewGuid(), Guid.NewGuid(), director, Guid.NewGuid(), Guid.NewGuid(), source, team,
+                            state.AcceptedVision.ConversationId, r.Gaps, r.OperationalImpact, r.InterimControls, r.DecisionFingerprint,
+                            "Pending", null, DateTimeOffset.UtcNow, null);
+                        return Task.FromResult(saved);
+                    });
+        }
+        // With initial hiring, no replenishment capabilities exist: even a read would fail this test.
+        var context = runtime.CreateContext();
+        var missing = VideoGameCreativeDirectorAgent.BuildRequiredStudioRoles(director);
+        await VideoGameCreativeDirectorAgent.EnsureStaffingReplacementAsync(state, resource, missing, context, default);
+        await VideoGameCreativeDirectorAgent.EnsureStaffingReplacementAsync(state, resource, missing, context, default);
+        Assert.Equal(previouslyStaffed ? 1 : 0, submissions);
+    }
+
+    [Fact]
+    public void InitialHiringAndDifferentTeamsAreNotLostCapacity()
+    {
+        var team = Guid.NewGuid();
+        var state = new CreativeDirectorOperatingState { TeamId = team };
+        Assert.False(VideoGameCreativeDirectorAgent.WasPreviouslyStaffed(state, team, VideoGameRoleKeys.Producer));
+        state = state with { ProducerEmployeeId = Guid.NewGuid() };
+        Assert.True(VideoGameCreativeDirectorAgent.WasPreviouslyStaffed(state, team, VideoGameRoleKeys.Producer));
+        Assert.False(VideoGameCreativeDirectorAgent.WasPreviouslyStaffed(state, Guid.NewGuid(), VideoGameRoleKeys.Producer));
+        Assert.False(VideoGameCreativeDirectorAgent.WasPreviouslyStaffed(state, team, VideoGameRoleKeys.TechnicalDirector));
+    }
+
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public async Task AttentionRecoversOnlyPendingRequestsAddressedToThisDirector(bool addressedToDirector)

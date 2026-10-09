@@ -9,10 +9,19 @@ public sealed partial class VideoGameCreativeDirectorAgent
     {
         if (state.HandoffSessionId is not { } id) return;
         var session = await context.Platform.Communication.ReadCoordinationAsync(id, token);
+        RequireProgressingHandoff(session, "Producer handoff");
+    }
+
+    internal static void RequireProgressingHandoff(AgentCoordinationSession session, string step)
+    {
         if (session.Status is "Failed" or "Blocked" or "Cancelled")
             throw new InvalidOperationException(
-                $"Producer handoff {id:D} is {session.Status}. " +
+                $"{step} {session.Id:D} is {session.Status}. " +
                 ReconcileStallPolicy.Summarize(session.FinalSummary) +
                 " Eligible execution failures resume on a ready replacement runtime with bounded retries; persistent failures require manager review in Communications.");
     }
+
+    internal static bool WasPreviouslyStaffed(CreativeDirectorOperatingState state, Guid teamId, string roleKey) =>
+        state.TeamId == teamId && (state.SpecialistEmployeeIds.ContainsKey(roleKey) ||
+            roleKey == CrosswiredStudios.VideoGame.Contracts.VideoGameRoleKeys.Producer && state.ProducerEmployeeId.HasValue);
 }

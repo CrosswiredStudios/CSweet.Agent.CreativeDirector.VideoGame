@@ -7,7 +7,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.18.0`
+- Version: `1.18.1`
 - Project approvals: `PresentProjectApprovalAsync` calls `platform.user-action.suggest.v1` with workflow `approval.review.v1` and the proposal ID. Communications renders Approve / More info / Deny; the host validates ownership, the private approver conversation, and current decision authority. Stable keys recover interrupted attachment without another proposal. The host must support this workflow and the capability must be granted during upgrade.
 - The Creative Director reviews direct-report planning decisions against the accepted brief, resolves delegated direction, and escalates material changes to the CEO.
 - Initial delivery team review: Technical Director, game engineer, and QA can be proposed together from the exact accepted brief; additional roles require scoped backlog evidence.
@@ -123,7 +123,7 @@ window; the selected model and provider remain authoritative limits. If the mode
 the whole output budget on reasoning and returns no pitch text, adjust these settings and retry
 the saved direction. Other Creative Director responses use the provider's normal output limit.
 
-Built with `CSweet.Agent.SDK` 3.59.1, `CSweet.Memory` 0.5.0.
+Built with `CSweet.Agent.SDK` 3.60.0, `CSweet.Memory` 0.5.0.
 
 
 ## Extension ownership and isolated builds
@@ -160,7 +160,7 @@ Reimport both agents to enable this protocol; legacy unrefined handoffs are bloc
 
 ## Shared collaboration SDK
 
-Uses CSweet.Agent.SDK 3.59.0 typed document references, explicit coordination read sharing,
+Uses CSweet.Agent.SDK 3.60.0 typed document references, explicit coordination read sharing,
 accepted-revision lookup, and handoff readiness checks. Pitch content and staffing judgment
 remain agent-specific. See the SDK's `docs/collaboration.md` for reusable documentation requests,
 clarification, review, and personal-work dependency waits. The matching C-Sweet host is required

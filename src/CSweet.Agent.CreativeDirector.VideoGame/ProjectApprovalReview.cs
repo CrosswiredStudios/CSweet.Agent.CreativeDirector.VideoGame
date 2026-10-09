@@ -98,8 +98,15 @@ public sealed partial class VideoGameCreativeDirectorAgent
         var current = await ReadStateAsync(context, token, conversationId: conversationId);
         var proposalArtifact = request.Transcript.LastOrDefault(x => x.SpeakerOrganizationUserId == request.Counterpart.OrganizationUserId &&
             x.Artifact?.Type == "video-game.project-foundation.proposal.v1")?.Artifact;
-        if (original?.Key != current.State.AcceptedVision?.Digest || request.Counterpart.OrganizationUserId != current.State.ProducerEmployeeId || proposalArtifact is null)
+        if (original?.Key != current.State.AcceptedVision?.Digest || request.Counterpart.OrganizationUserId != current.State.ProducerEmployeeId)
             return AgentCoordinationTurnResult.Blocked("Project review requires the assigned Producer and exact accepted direction.");
+        var latestProducerTurn = request.Transcript.LastOrDefault(x => x.SpeakerOrganizationUserId == request.Counterpart.OrganizationUserId);
+        if (latestProducerTurn?.Disposition == AgentCoordinationDispositions.Blocked)
+            return request.IsFinalization
+                ? AgentCoordinationTurnResult.Blocked("Project proposal blocked: " + ReconcileStallPolicy.Summarize(latestProducerTurn.Content))
+                : AgentCoordinationTurnResult.Continue("This collaboration has been resumed. Retry the project proposal against the same accepted direction, preserving any existing approval and its idempotency key.");
+        if (proposalArtifact is null)
+            return AgentCoordinationTurnResult.Blocked("The Producer has not supplied a project proposal ID for review.");
         var id = proposalArtifact.Payload.GetProperty("proposalId").GetGuid();
         var review = (await ReadProjectApprovalsAsync(id, context, token)).SingleOrDefault();
         if (review is null || review.RequesterId != request.Counterpart.OrganizationUserId)
