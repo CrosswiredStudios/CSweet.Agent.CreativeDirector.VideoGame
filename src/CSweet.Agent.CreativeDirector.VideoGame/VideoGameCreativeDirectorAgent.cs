@@ -34,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.17.6";
+    public override string Version => "1.17.7";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -856,6 +856,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
             };
             var saved = await SaveStateAsync(state, current.Revision, Guid.NewGuid(),
                 $"vision-accepted:{latest.Digest}", context, cancellationToken);
+            await WakeProjectReviewAsync(conversationId, context, cancellationToken);
             if (saved.State.VisionTodoId.HasValue)
                 await TryRequeuePersonalTodoAsync(saved.State.VisionTodoId.Value, context, cancellationToken);
             _ = await EnsureStaffingTodoAsync(
@@ -1488,6 +1489,16 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         {
             // Another wake or event already moved the card. The next queue reconciliation is authoritative.
         }
+    }
+
+    private static async Task WakeProjectReviewAsync(Guid conversationId,
+        AgentRuntimeContext context, CancellationToken cancellationToken)
+    {
+        var directory = await context.Platform.PersonalTodo.ListAsync(cancellationToken);
+        foreach (var item in directory.Boards.SelectMany(x => x.Items).Where(x =>
+                     CreativeDirectorAgenda.IsProjectReview(x) &&
+                     CreativeDirectorAgenda.ProjectReviewConversationId(x) == conversationId))
+            await TryRequeuePersonalTodoAsync(item.Id, context, cancellationToken);
     }
 
     private static bool IsRecoverableAgendaFailure(Exception exception, CancellationToken cancellationToken)
@@ -2635,6 +2646,15 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
             if (task.Status == PersonalTodoStatuses.Blocked &&
                 task.BlockReason == "A portfolio review requires its source project conversation.")
                 await TryRequeuePersonalTodoAsync(task.Id, context, cancellationToken);
+            // Recover a decision wake missed while offline or interrupted after saving state.
+            // The persisted wait describes the phase at deferral, not the current phase.
+            else if (task.Status == PersonalTodoStatuses.Running && task.Wait is { } wait)
+            {
+                var current = await ReadStateByKeyAsync(entry.StateKey, context, cancellationToken);
+                if (wait.Reason.StartsWith("Project reconciled. Next step: ", StringComparison.Ordinal) &&
+                    !wait.Reason.StartsWith($"Project reconciled. Next step: {CreativeDirectorNextStep.Describe(current.State)}.", StringComparison.Ordinal))
+                    await TryRequeuePersonalTodoAsync(task.Id, context, cancellationToken);
+            }
         }
     }
 
@@ -3278,6 +3298,16 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
             ? await ReadStateAsync(context, cancellationToken, resourceEvent.Context.WorkstreamId)
             : await ReadStateForConversationAsync(conversationId, context, cancellationToken);
         var state = current.State;
+        // A duplicate decision can recover an interruption after the state save but before
+        // the review wake. The exact artifact/revision binding still controls the recovery.
+        if (state.AcceptedVision is { } alreadyAccepted &&
+            alreadyAccepted.ArtifactId == artifactId &&
+            alreadyAccepted.ArtifactRevisionId == resourceEvent.AggregateId &&
+            state.IntakeConversationId is { } acceptedConversation)
+        {
+            await WakeProjectReviewAsync(acceptedConversation, context, cancellationToken);
+            return;
+        }
         if (state.Phase != CreativeDirectorPhase.HighLevelReview ||
             state.HighLevelArtifactId != artifactId ||
             state.HighLevelLatestRevisionId != resourceEvent.AggregateId ||
@@ -3341,6 +3371,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         };
         var saved = await SaveStateAsync(state, current.Revision, message.EventId,
             $"vision-accepted:{exact.Id:N}:{exact.ContentSha256}", context, cancellationToken);
+        await WakeProjectReviewAsync(state.IntakeConversationId.Value, context, cancellationToken);
         if (saved.State.VisionTodoId.HasValue)
             await TryRequeuePersonalTodoAsync(saved.State.VisionTodoId.Value, context, cancellationToken);
         _ = await EnsureStaffingTodoAsync(

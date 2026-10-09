@@ -145,8 +145,10 @@ public sealed class CreativeDirectorInteractionTests
             "Personal agenda correlation 'unknown.v1' is not supported by this Creative Director version."), result);
     }
 
-    [Fact]
-    public async Task AttentionReviewEnsuresOneCorrelatedAgendaCardPerProject()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AttentionReviewEnsuresOneCorrelatedAgendaCardPerProject(bool missedWake)
     {
         var conversationId = Guid.NewGuid();
         var stateKey = VideoGameCreativeDirectorAgent.ProjectStateKey(null, conversationId);
@@ -181,8 +183,10 @@ public sealed class CreativeDirectorInteractionTests
                     captured = request;
                     legacyCard = PersonalItem(request.Title, request.CorrelationId!, conversationId) with
                     {
-                        Status = PersonalTodoStatuses.Blocked,
+                        Status = missedWake ? PersonalTodoStatuses.Running : PersonalTodoStatuses.Blocked,
                         SourceConversationId = null,
+                        Wait = missedWake ? new PersonalTodoWaitState(DateTimeOffset.UtcNow.AddHours(4),
+                            "Project reconciled. Next step: the CEO decides the submitted pitch revision. Waiting briefly for decisions.") : null,
                         BlockReason = "A portfolio review requires its source project conversation."
                     };
                     return Task.FromResult(legacyCard);
@@ -392,9 +396,22 @@ public sealed class CreativeDirectorInteractionTests
                 VideoGameCreativeDirectorAgent.PortfolioStateKey, portfolio)
         };
         var confirmations = new List<string>();
+        var reviewTodo = PersonalItem("Review creative direction", CreativeDirectorAgenda.ProjectReviewCorrelation(conversationId), conversationId) with
+        {
+            Status = PersonalTodoStatuses.Running,
+            Wait = new PersonalTodoWaitState(DateTimeOffset.UtcNow.AddHours(4), "Waiting for the CEO to decide the pitch", null)
+        };
+        var unrelatedReview = reviewTodo with { Id = Guid.NewGuid(), CorrelationId = CreativeDirectorAgenda.ProjectReviewCorrelation(Guid.NewGuid()), SourceConversationId = null };
+        var requeues = new List<RequeuePersonalTodoItemRequest>();
         AddPersonalTodoItemRequest? staffingTodoRequest = null;
         PersonalTodoItem? staffingTodo = null;
         var runtime = new AgentTestRuntime()
+            .RegisterCapability<JsonElement, PersonalTodoDirectory>(PersonalTodoCapabilities.Read,
+                (_, _) => Task.FromResult(new PersonalTodoDirectory(
+                    [new PersonalTodoBoard(reviewTodo.BoardId, reviewTodo.OwnerOrganizationUserId,
+                        "Creative Director", null, null, 1, [reviewTodo, unrelatedReview])], reviewTodo.OwnerOrganizationUserId)))
+            .RegisterCapability<RequeuePersonalTodoItemRequest, PersonalTodoItem>(PersonalTodoCapabilities.Requeue,
+                (request, _) => { requeues.Add(request); return Task.FromResult(reviewTodo with { Status = PersonalTodoStatuses.Ready, Wait = null }); })
             .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(
                 PlatformCapabilities.AgentOperatingStateRead,
                 (request, _) => Task.FromResult(new AgentOperatingStateReadResponse(
@@ -472,6 +489,14 @@ public sealed class CreativeDirectorInteractionTests
         Assert.Equal(sourceMessageId, staffingTodoRequest.SourceMessageId);
         Assert.Contains(confirmations, message => message.Contains("vision is locked", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(confirmations, message => message.Contains("personal task", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(reviewTodo.Id, Assert.Single(requeues).ItemId);
+        // Replay can recover a wake interrupted after the state write; the platform's stable
+        // mutation key makes the same review revision idempotent.
+        await new VideoGameCreativeDirectorAgent().HandleEventAsync(
+            new AgentEventEnvelope(Guid.NewGuid(), eventId, WorkstreamEventNames.ArtifactRevisionDecidedV1,
+                JsonSerializer.SerializeToElement(resourceEvent), DateTimeOffset.UtcNow), context, CancellationToken.None);
+        Assert.Equal(2, requeues.Count);
+        Assert.Equal(requeues[0].IdempotencyKey, requeues[1].IdempotencyKey);
     }
 
     private static AgentOperatingStateResponse OperatingState<T>(string key, T payload) =>

@@ -7,7 +7,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.17.6`
+- Version: `1.17.7`
 - Project approvals: `PresentProjectApprovalAsync` calls `platform.user-action.suggest.v1` with workflow `approval.review.v1` and the proposal ID. Communications renders Approve / More info / Deny; the host validates ownership, the private approver conversation, and current decision authority. Stable keys recover interrupted attachment without another proposal. The host must support this workflow and the capability must be granted during upgrade.
 - The Creative Director reviews direct-report planning decisions against the accepted brief, resolves delegated direction, and escalates material changes to the CEO.
 - Initial delivery team review: Technical Director, game engineer, and QA can be proposed together from the exact accepted brief; additional roles require scoped backlog evidence.
