@@ -34,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.18.2";
+    public override string Version => "1.18.3";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -242,21 +242,20 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         if (resourceEvent is null) return;
         var current = await ReadStateAsync(context, cancellationToken, resourceEvent.Context.WorkstreamId);
         if (current.State.AcceptedVision is null) return;
-        var memberIds = resourceEvent.Metadata.TryGetProperty("memberArtifactIds", out var members) &&
-                        members.ValueKind == JsonValueKind.Array
-            ? members.EnumerateArray().Select(x => x.GetGuid()).Distinct().ToList()
-            : [];
-        foreach (var artifactId in memberIds)
-            _ = await context.Platform.Artifacts.RequestAccessAsync(new RequestArtifactAccess(
-                artifactId, ["artifact.read", "artifact.decide"],
-                "Creative Direction requires exact-file read and decision grants to perform the profile-mandated semantic package review.",
-                $"creative-package-access:{resourceEvent.AggregateId:N}:{artifactId:N}"), cancellationToken);
         await SaveStateAsync(current.State with
         {
             DetailedDesignPackageId = resourceEvent.AggregateId,
             Phase = CreativeDirectorPhase.PackageReview
         }, current.Revision, message.EventId,
             $"typed-package-submitted:{resourceEvent.AggregateId:N}:{resourceEvent.Revision}", context, cancellationToken);
+        // Package reads require read access to every member. Check the event's exact members
+        // first so a denied package read can recover the missing document permission.
+        var missingAccess = false;
+        if (resourceEvent.Metadata.TryGetProperty("memberArtifactIds", out var members) && members.ValueKind == JsonValueKind.Array)
+            foreach (var artifactId in members.EnumerateArray().Select(x => x.GetGuid()).Distinct())
+                missingAccess |= !await ReviewPackageMemberWithAccessAsync(resourceEvent.AggregateId, artifactId,
+                    context, _ => Task.CompletedTask, cancellationToken);
+        if (missingAccess) return;
         await ReconcileDetailedPackageAsync(context, cancellationToken, resourceEvent.Context.WorkstreamId);
     }
 
@@ -2381,28 +2380,33 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
 
         var mode = state.ManagerPreferences.InvolvementMode;
         var allMemberRevisionsAccepted = true;
+        var missingAccess = false;
         foreach (var member in package.Members.OrderBy(x => x.Position))
         {
-            var document = await context.Platform.Artifacts.GetAsync(member.ArtifactId, cancellationToken);
-            if (document.SubmittedRevisionId is not Guid revisionId)
+            var accessible = await ReviewPackageMemberWithAccessAsync(package.Id, member.ArtifactId, context, async document =>
             {
-                allMemberRevisionsAccepted = false;
-                continue;
-            }
-            var exact = document.Revisions.Single(x => x.Id == revisionId);
-            var review = await ReviewDetailedArtifactAsync(
-                document, exact, member.RequiredDocumentType, state, context, cancellationToken);
-            var findings = review.Findings.Select(x => new ReviewFinding(
-                x.Code, x.Section, NormalizeFindingSeverity(x.Severity), x.Blocking,
-                x.Summary, x.RequiredFollowUp)).ToList();
-            var disposition = NormalizeArtifactDisposition(review.Disposition, findings);
-            _ = await context.Platform.Artifacts.DecideStructuredAsync(new StructuredArtifactDecisionRequest(
-                document.Id, exact.Id, exact.ContentSha256,
-                RubricForArtifact(document.DocumentType, member.RequiredDocumentType), disposition, findings,
-                review.Summary,
-                $"creative-semantic-review:{package.Id:N}:{exact.Id:N}:{exact.ContentSha256}"), cancellationToken);
-            allMemberRevisionsAccepted &= disposition is "accepted" or "accepted-with-findings";
+                if (document.SubmittedRevisionId is not Guid revisionId)
+                {
+                    allMemberRevisionsAccepted = false;
+                    return;
+                }
+                var exact = document.Revisions.Single(x => x.Id == revisionId);
+                var review = await ReviewDetailedArtifactAsync(
+                    document, exact, member.RequiredDocumentType, state, context, cancellationToken);
+                var findings = review.Findings.Select(x => new ReviewFinding(
+                    x.Code, x.Section, NormalizeFindingSeverity(x.Severity), x.Blocking,
+                    x.Summary, x.RequiredFollowUp)).ToList();
+                var disposition = NormalizeArtifactDisposition(review.Disposition, findings);
+                _ = await context.Platform.Artifacts.DecideStructuredAsync(new StructuredArtifactDecisionRequest(
+                    document.Id, exact.Id, exact.ContentSha256,
+                    RubricForArtifact(document.DocumentType, member.RequiredDocumentType), disposition, findings,
+                    review.Summary,
+                    $"creative-semantic-review:{package.Id:N}:{exact.Id:N}:{exact.ContentSha256}"), cancellationToken);
+                allMemberRevisionsAccepted &= disposition is "accepted" or "accepted-with-findings";
+            }, cancellationToken);
+            missingAccess |= !accessible;
         }
+        if (missingAccess) return;
 
         if (mode == ManagerInvolvementMode.Delegated && allMemberRevisionsAccepted)
             package = await context.Platform.Artifacts.DecidePackageAsync(package.Id,
@@ -2423,6 +2427,26 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
                 $"Detailed game-design package `{package.Id:D}` is ready for your milestone approval. Exact members: {members}. Open /organizations/{context.BusinessId}/documents?packageId={package.Id:D} to review it.",
                 $"creative-package-manager-review:{package.Id:N}:{package.Version}",
                 ProjectWorkContext(state, context, package.Id), cancellationToken);
+    }
+
+    internal static async Task<bool> ReviewPackageMemberWithAccessAsync(Guid packageId, Guid artifactId,
+        AgentRuntimeContext context, Func<ArtifactDocument, Task> review, CancellationToken token)
+    {
+        try
+        {
+            var document = await context.Platform.Artifacts.GetAsync(artifactId, token);
+            await review(document);
+            return true;
+        }
+        catch (PlatformCapabilityException exception) when (exception.Code == PlatformCapabilityErrorCode.Denied &&
+            exception.Capability is PlatformCapabilities.ArtifactRead or PlatformCapabilities.ArtifactDecideV2)
+        {
+            var action = exception.Capability == PlatformCapabilities.ArtifactRead ? "artifact.read" : "artifact.decide";
+            _ = await context.Platform.Artifacts.RequestAccessAsync(new RequestArtifactAccess(
+                artifactId, [action], "Creative Direction was denied access required to review this exact package member.",
+                $"creative-package-access:{packageId:N}:{artifactId:N}:{action}"), token);
+            return false;
+        }
     }
 
     private async Task<SemanticArtifactReview> ReviewDetailedArtifactAsync(
