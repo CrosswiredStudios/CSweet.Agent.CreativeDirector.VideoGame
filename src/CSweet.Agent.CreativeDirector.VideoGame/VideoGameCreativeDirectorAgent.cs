@@ -34,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.18.4";
+    public override string Version => "1.18.5";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -825,10 +825,16 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
             state.ManagerPreferences.InvolvementWasExplicit &&
             IsInteractionPreferenceOnly(currentMessage, incoming.Attachments))
         {
+            _ = await context.Platform.AskUserAsync(new AskUserRequest(
+                conversationId,
+                incoming.TurnId,
+                "What initial game direction should I build on? Share your player fantasy, core loop, genre and tone, target platform, and any non-negotiables—or ask me to propose starting concepts.",
+                [],
+                string.Empty,
+                $"creative-initial-direction:{incoming.MessageId:N}"), cancellationToken);
             await stream.CommitAsync(
                 $"Got it—I recorded {DescribeInvolvementMode(state.ManagerPreferences.InvolvementMode)} mode. " +
-                "Send your initial game direction or reference files when ready, or tell me to propose starting concepts. " +
-                "Helpful starting points are the player fantasy, core loop, genre and tone, target platform, and any non-negotiables; I’ll own everything you leave unspecified.",
+                "Add your initial game direction below, or tell me to propose starting concepts. You can share reference files in this conversation; I’ll own everything you leave unspecified.",
                 cancellationToken);
             return;
         }

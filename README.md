@@ -7,7 +7,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.18.4`
+- Version: `1.18.5`
 
 Package reviews use existing file permissions. Naomi requests an exact-file read or decision grant
 only after the platform denies that operation, and waits for access before escalating milestone review.
@@ -54,6 +54,10 @@ and retryable. Requesting changes keeps the premise in review and captures bound
 before another revision is created. While pitch creation
 or revision is running, the active turn immediately shows a short conversational acknowledgement;
 the final review response replaces that provisional text instead of adding another permanent message.
+After an involvement-only answer, `HandleManagerMessageAsync` requests initial game direction
+with `AskUserAsync` using empty options and an empty recommendation. This durable open-ended
+decision appears in chat and Overview's Needs Your Attention; its custom answer resumes intake.
+Deploy the platform with open-ended `ask_user` support before upgrading this agent.
 Collaborative mode supports iterative refinement until the manager locks an exact revision. The
 authoritative operating state stores the involvement mode, platform/genre constraints, story and
 approval preferences, reference guidance, supporting message IDs, and update time.

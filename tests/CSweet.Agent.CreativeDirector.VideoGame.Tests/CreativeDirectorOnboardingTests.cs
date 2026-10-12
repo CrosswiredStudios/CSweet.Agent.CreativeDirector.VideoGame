@@ -265,7 +265,16 @@ public sealed class CreativeDirectorOnboardingTests
         {
             [projectStateKey] = initial
         };
+        AskUserRequest? directionQuestion = null;
         var runtime = new AgentTestRuntime()
+            .RegisterCapability<AskUserRequest, UserQuestionResponse>(
+                PlatformCapabilities.UserInputRequest,
+                (request, _) =>
+                {
+                    directionQuestion = request;
+                    return Task.FromResult(new UserQuestionResponse(Guid.NewGuid(), request.Prompt,
+                        "Pending", [], request.RecommendedOptionId, null, null, DateTimeOffset.UtcNow, null));
+                })
             .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(
                 PlatformCapabilities.AgentOperatingStateRead,
                 (request, _) => Task.FromResult(new AgentOperatingStateReadResponse(
@@ -305,6 +314,13 @@ public sealed class CreativeDirectorOnboardingTests
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
         Assert.Equal(ManagerInvolvementMode.MilestoneReview, state!.ManagerPreferences.InvolvementMode);
         Assert.True(state.ManagerPreferences.InvolvementWasExplicit);
+        Assert.NotNull(directionQuestion);
+        Assert.Equal(conversationId, directionQuestion.ConversationId);
+        Assert.Equal(incoming.TurnId, directionQuestion.ChatTurnId);
+        Assert.Empty(directionQuestion.Options);
+        Assert.Empty(directionQuestion.RecommendedOptionId);
+        Assert.Contains("initial game direction", directionQuestion.Prompt);
+        Assert.Equal($"creative-initial-direction:{incoming.MessageId:N}", directionQuestion.IdempotencyKey);
         var response = Assert.Single(runtime.Progress,
             progress => progress.GetProperty("kind").GetString() == AgentTurnStreamKinds.FinalCommit);
         Assert.Contains("recorded milestone-review mode", response.GetProperty("delta").GetString(),
