@@ -527,10 +527,8 @@ public abstract class VideoGameSpecialistAgentBase : CSweetAgentBase
         SpecialistDelivery delivery) =>
         new(assignment.StageExecutionId, assignment.AttemptId, WorkExecutionDispositions.Completed,
             IsHierarchicalArtifact(assignment) ? "artifact-delivered" : "completed", delivery.Summary,
-            JsonSerializer.SerializeToElement(new
-            {
-                delivery.ArtifactId, delivery.RevisionId, delivery.Sha256, delivery.RemainingRisks
-            }),
+            new WorkArtifactDelivery(delivery.ArtifactId, delivery.RevisionId, delivery.Sha256)
+            { RemainingRisks = delivery.RemainingRisks }.ToOutput(),
             [new WorkExecutionEvidence(IsHierarchicalArtifact(assignment) ? "artifact-revision" : "ArtifactRevision", delivery.ArtifactId.ToString("D"),
                 delivery.RevisionId.ToString("D"), "application/json")], []);
 
