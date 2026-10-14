@@ -310,7 +310,7 @@
           "prototype-design"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -328,7 +328,7 @@
           "technical-decomposition"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -346,7 +346,7 @@
           "build-diagnostics"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -365,7 +365,7 @@
           "accessibility-testing"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -381,7 +381,7 @@
           "research-analysis"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -394,7 +394,7 @@
           "art-direction"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -406,7 +406,7 @@
           "asset-production"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -421,7 +421,7 @@
           "visual-performance"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -434,7 +434,7 @@
           "narrative-design"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -447,7 +447,7 @@
           "audio-design"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -460,7 +460,7 @@
           "level-design"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -473,7 +473,7 @@
           "ui-ux-accessibility-design"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -486,7 +486,7 @@
           "build-release-engineering"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -500,7 +500,7 @@
           "game-security-privacy"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -514,7 +514,7 @@
           "progression-balance"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -526,7 +526,7 @@
           "game-localization"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -540,7 +540,7 @@
           "game-security-privacy"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -552,7 +552,7 @@
           "game-marketing-community"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -565,7 +565,7 @@
           "platform-certification"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       },
       {
@@ -578,7 +578,7 @@
           "live-operations"
         ],
         "requiredCapabilityKeys": [
-          "work.execution.run.v2"
+          "work.execution.run"
         ]
       }
     ],

@@ -30,7 +30,7 @@ public sealed class ProducerKickoffTests
                 Task.FromResult(JsonSerializer.SerializeToElement(new { requests = new[] { new { id = resource, status = approved ? "Approved" : "Pending", teamId = team } } })))
             .RegisterCapability<JsonElement, JsonElement>("platform.team-roster.read.v2", (_, _) => Task.FromResult(JsonSerializer.SerializeToElement(new {
                 team = new { teamId = team.ToString(), members = new[] { new { employeeId = sender.ToString(), presence,
-                    isAvailable = true, agentInstallationId = Guid.NewGuid(), declaredRoleKeys = new[] { role }, effectiveCapabilities = new[] { "work.execution.run.v1" } } } }
+                    isAvailable = true, agentInstallationId = Guid.NewGuid(), declaredRoleKeys = new[] { role }, effectiveCapabilities = new[] { "work.execution.run" } } } }
             })));
         var incoming = new CommunicationMessageReceivedEvent(Guid.NewGuid(), Guid.NewGuid().ToString(), sender.ToString(),
             "I have joined as Producer.", authenticatedSender ? new Dictionary<string, string> {

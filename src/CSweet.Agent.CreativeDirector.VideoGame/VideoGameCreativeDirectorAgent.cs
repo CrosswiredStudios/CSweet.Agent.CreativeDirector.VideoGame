@@ -34,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "1.19.1";
+    public override string Version => "2.0.0";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -2587,46 +2587,46 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         [
             Role(VideoGameRoleKeys.Producer, "Video Game Producer",
                 "Lead the project board, sprints, schedule, budget, dependencies, staffing, risks, and team reporting.",
-                 WorkManagementCapabilityNames.ExecutionRunV1, 1, creativeDirectorOrganizationUserId, true),
+                 WorkManagementCapabilityNames.ExecutionRun, 1, creativeDirectorOrganizationUserId, true),
             Role(VideoGameRoleKeys.GameDesigner, "Game Designer",
                 "Own gameplay systems, mechanics, progression, balance, prototype hypotheses, and content rules.",
-                 WorkManagementCapabilityNames.ExecutionRunV1, 2, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRun, 2, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.TechnicalDirector, "Video Game Technical Director",
                 "Own engine feasibility, architecture, performance budgets, technical standards, and technical approvals.",
-                 WorkManagementCapabilityNames.ExecutionRunV1, 2, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRun, 2, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.Engineer, "Video Game Engineer",
                 "Implement gameplay and runtime code, tests, integrations, source-control delivery, and build fixes.",
-                 WorkManagementCapabilityNames.ExecutionRunV1, 3, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRun, 3, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.QualityAssurance, "Video Game QA",
                 "Own test plans, reproducible defects, regression, compatibility, accessibility checks, and validation evidence.",
-                 WorkManagementCapabilityNames.ExecutionRunV1, 3, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRun, 3, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.PlaytestResearcher, "Video Game Playtest Researcher",
                 "Own consent-governed player evaluation plans, scripts, reports, evidence, and actionable findings.",
-                 WorkManagementCapabilityNames.ExecutionRunV1, 4, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRun, 4, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.ArtDirector, "Video Game Art Director",
                 "Own the art bible, visual targets, asset briefs, consistency review, and final visual findings.",
-                 WorkManagementCapabilityNames.ExecutionRunV1, 4, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRun, 4, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.Artist, "Video Game Artist",
                 "Create and curate authorized provided, procedural, or generative assets under the durable asset strategy.",
-                 WorkManagementCapabilityNames.ExecutionRunV1, 5, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRun, 5, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.TechnicalArtist, "Video Game Technical Artist",
                 "Own import pipelines, shaders, materials, rigs, compression, engine readiness, and visual performance.",
-                 WorkManagementCapabilityNames.ExecutionRunV1, 5, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRun, 5, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.NarrativeDesigner, "Video Game Narrative Designer",
                 "Own world, story structure, characters, dialogue, narrative systems, and implementation specifications.",
-                 WorkManagementCapabilityNames.ExecutionRunV1, 5, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRun, 5, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.AudioDesigner, "Video Game Audio Designer",
                 "Own audio direction, SFX/music/VO assets or briefs, implementation metadata, loudness, looping, and accessibility.",
-                 WorkManagementCapabilityNames.ExecutionRunV1, 5, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRun, 5, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.LevelDesigner, "Video Game Level Designer",
                 "Own level flows, encounters, pacing, content assembly, metrics, and playable level evidence.",
-                 WorkManagementCapabilityNames.ExecutionRunV1, 5, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRun, 5, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.UserExperienceDesigner, "Video Game UI/UX/Accessibility Designer",
                 "Own flows, HUD, controls, alternatives, readability, usability, and accessibility acceptance.",
-                 WorkManagementCapabilityNames.ExecutionRunV1, 4, creativeDirectorOrganizationUserId),
+                 WorkManagementCapabilityNames.ExecutionRun, 4, creativeDirectorOrganizationUserId),
             Role(VideoGameRoleKeys.BuildReleaseEngineer, "Video Game Build/Release Engineer",
                 "Own CI/build configuration, certified adapter operations, packaging, release readiness, and publication proposals.",
-                 WorkManagementCapabilityNames.ExecutionRunV1, 3, creativeDirectorOrganizationUserId)
+                 WorkManagementCapabilityNames.ExecutionRun, 3, creativeDirectorOrganizationUserId)
         ];
     }
 

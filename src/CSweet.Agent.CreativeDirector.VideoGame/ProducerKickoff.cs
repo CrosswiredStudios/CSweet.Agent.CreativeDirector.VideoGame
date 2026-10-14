@@ -31,7 +31,7 @@ public sealed partial class VideoGameCreativeDirectorAgent
             if (roster?.Members.Any(x => x.EmployeeId == sender.ToString("D") && x.Presence == "Active" &&
                 x.IsAvailable && x.AgentInstallationId.HasValue &&
                 x.DeclaredRoleKeys.Contains(VideoGameRoleKeys.Producer) &&
-                x.EffectiveCapabilities.Contains("work.execution.run.v1")) == true)
+                x.EffectiveCapabilities.Contains("work.execution.run")) == true)
                 result.Add(current);
         }
         return result;

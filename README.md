@@ -7,7 +7,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `1.19.1`
+- Version: `2.0.0`
 
 Package reviews use existing file permissions. Naomi requests an exact-file read or decision grant
 only after the platform denies that operation, and waits for access before escalating milestone review.
@@ -295,3 +295,7 @@ The Director initiates project setup through the Producer, reviews the stored pr
 ## Delegation and tracking
 
 SDK 3.65.0 dispatches authenticated delegation before specialist conversation fallback. The manifest requests delegation, work tracking, directory and conversation reads, personal commitments and model interpretation. These declarations require reviewed grants; existing resource permissions and approval rules still apply. The shared SDK owns coordinator reporting and wake recovery.
+
+## Execution contract (2.0.0)
+
+Execution uses one `work.execution.run` capability and `WorkExecutionAssignment` from SDK/WorkManagement.Contracts 4.0.0. Task and aggregate scopes retain their distinct authority checks within that envelope. Upgrade the platform and executing agents together; no legacy execution adapter remains.
