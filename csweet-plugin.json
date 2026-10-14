@@ -16,7 +16,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "Naomi Chen",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "publisher": {
     "id": "com.csweet",
     "name": "C-Sweet"
@@ -832,6 +832,18 @@
       "scope": "organization",
       "purpose": "Use shared SDK delegation, authenticated recipient resolution, canonical work and durable reporting within existing resource authority.",
       "modelVisible": false
+    },
+    {
+      "name": "platform.management.incident.presentation.update.v1",
+      "scope": "organization",
+      "purpose": "Persist a grounded manager report and recovery outcome within current incident reporting authority.",
+      "modelVisible": false
+    },
+    {
+      "name": "platform.management.incident.resolution.read.v1",
+      "scope": "organization",
+      "purpose": "Read the authenticated human recovery choice bound to this manager and its durable conversation turn.",
+      "modelVisible": false
     }
   ],
   "events": {
@@ -875,7 +887,8 @@
       "com.csweet.project-approval.requested.v1",
       "com.csweet.project-approval.decided.v1",
       "com.csweet.work.delegation.received.v1",
-      "com.csweet.work.tracking.changed.v1"
+      "com.csweet.work.tracking.changed.v1",
+      "com.csweet.management.incident.owner-report-requested.v1"
     ]
   },
   "configuration": [

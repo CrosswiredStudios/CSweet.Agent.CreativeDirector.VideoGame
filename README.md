@@ -7,7 +7,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `2.0.0`
+- Version: `2.1.0`
 
 Package reviews use existing file permissions. Naomi requests an exact-file read or decision grant
 only after the platform denies that operation, and waits for access before escalating milestone review.
@@ -130,7 +130,7 @@ window; the selected model and provider remain authoritative limits. If the mode
 the whole output budget on reasoning and returns no pitch text, adjust these settings and retry
 the saved direction. Other Creative Director responses use the provider's normal output limit.
 
-Built with `CSweet.Agent.SDK` 3.65.0, `CSweet.Memory` 0.5.0.
+Built with `CSweet.Agent.SDK` 4.1.0, `CSweet.Memory` 0.5.0.
 
 
 ## Extension ownership and isolated builds
@@ -167,7 +167,7 @@ Reimport both agents to enable this protocol; legacy unrefined handoffs are bloc
 
 ## Shared collaboration SDK
 
-Uses CSweet.Agent.SDK 3.65.0 typed document references, explicit coordination read sharing,
+Uses CSweet.Agent.SDK 4.1.0 typed document references, explicit coordination read sharing,
 accepted-revision lookup, and handoff readiness checks. Pitch content and staffing judgment
 remain agent-specific. See the SDK's `docs/collaboration.md` for reusable documentation requests,
 clarification, review, and personal-work dependency waits. The matching C-Sweet host is required
@@ -175,7 +175,7 @@ for sharing at every coordination start; package import alone does not update th
 
 ## Provider queue handling
 
-Uses SDK 3.65.0 for acknowledged LLM waiting, conversation activity, and host-authoritative deadline updates. Deploy the matching C-Sweet AgentHost and reimport this package to enable the private polling protocol.
+Uses SDK 4.1.0 for acknowledged LLM waiting, conversation activity, and host-authoritative deadline updates. Deploy the matching C-Sweet AgentHost and reimport this package to enable the private polling protocol.
 
 ## Producer hiring kickoff
 
@@ -294,8 +294,12 @@ The Director initiates project setup through the Producer, reviews the stored pr
 
 ## Delegation and tracking
 
-SDK 3.65.0 dispatches authenticated delegation before specialist conversation fallback. The manifest requests delegation, work tracking, directory and conversation reads, personal commitments and model interpretation. These declarations require reviewed grants; existing resource permissions and approval rules still apply. The shared SDK owns coordinator reporting and wake recovery.
+SDK 4.1.0 dispatches authenticated delegation before specialist conversation fallback. The manifest requests delegation, work tracking, directory and conversation reads, personal commitments and model interpretation. These declarations require reviewed grants; existing resource permissions and approval rules still apply. The shared SDK owns coordinator reporting and wake recovery.
 
 ## Execution contract (2.0.0)
 
 Execution uses one `work.execution.run` capability and `WorkExecutionAssignment` from SDK/WorkManagement.Contracts 4.0.0. Task and aggregate scopes retain their distinct authority checks within that envelope. Upgrade the platform and executing agents together; no legacy execution adapter remains.
+
+## Shared manager blocker reporting
+
+This release uses SDK 4.1.0 `ManagerIncidentCoordinator` for evidence-based incident reports and human-selected fixes. The shared SDK dispatcher runs before this agent's specialist intake, coordinates authorized recovery or delegation, and preserves required approvals. The incident presentation/update and resolution/read grants plus `com.csweet.management.incident.owner-report-requested.v1` allow existing open incidents to receive refreshed reports. Apply the platform migration before upgrading.
