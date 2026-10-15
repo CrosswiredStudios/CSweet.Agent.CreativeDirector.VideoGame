@@ -40,7 +40,7 @@ public sealed class ManifestTests
         Assert.Equal(AgentBaseTypes.Manager, manifest.RolePolicy.BaseType);
         Assert.IsAssignableFrom<CSweetManagerAgentBase>(agent);
         Assert.Equal(["video-game-development", "game-creative-direction"], manifest.RolePolicy.SpecializationKeys);
-        Assert.Equal("AlwaysOn", manifest.Runtime.DefaultActivationMode);
+        Assert.Equal("OnDemand", manifest.Runtime.DefaultActivationMode);
         Assert.Contains(manifest.Requires, x => x.Name == PlatformCapabilities.BusinessProfileRead);
         Assert.Contains(manifest.Requires, x => x.Name == "platform.user-action.suggest.v1");
         Assert.Contains(manifest.Requires, x => x.Name == PlatformCapabilities.FinanceProfileRead);
