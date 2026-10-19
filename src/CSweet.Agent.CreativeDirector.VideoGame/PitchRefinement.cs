@@ -23,6 +23,8 @@ public sealed partial class VideoGameCreativeDirectorAgent
             document.WorkstreamId != state.WorkstreamId || document.TeamId != state.TeamId ||
             document.DocumentType != PitchProtocol.DocumentType || !PitchProtocol.ValidDocument(revision.Content))
             return AgentCoordinationTurnResult.Blocked("Review requires the exact shared planning document for this project and team.");
+        var ownerWait = await ReadPitchOwnerWaitAsync(request, state, review, context, token);
+        if (ownerWait is not null) return ownerWait;
         var answer = await PitchProtocol.CachedAsync($"pitch-director:{request.SessionId:N}:{request.TurnOrdinal}", context, async () =>
         {
             var provider = Settings.GetGuid("llmProviderId") ?? throw new InvalidOperationException("Configure the Creative Director LLM provider.");
@@ -34,7 +36,20 @@ public sealed partial class VideoGameCreativeDirectorAgent
                     Answer each open question and contribute concrete wording for the shared document. Preserve
                     the approved player promise, scope and non-goals. Do not invent facts or silently expand scope.
                     Identify unknowns and any material change requiring human approval; leave those questions open.
-                    Return JSON: accept (boolean), guidance (string), suggestedMarkdown (string).
+                    Return JSON: accept (boolean), guidance (string), suggestedMarkdown (string),
+                    requiresOwner (boolean), ownerQuestion (string or null).
+                    You own this collaboration. Resolve questions within your delegated authority yourself.
+                    Missing deadlines or a fixed schedule never require owner approval: delivery is forecast-driven.
+                    Accept a sufficient brief for planning without claiming production, spending or release approval.
+                    Feasibility, estimates and technical device/version choices may be planned specialist work;
+                    do not require an unhired specialist's evidence before proposing the staffing to obtain it.
+                    Preserve explicit external date constraints separately from forecasts and identify real conflicts.
+                    If an unresolved product, budget or external-commitment decision exceeds your authority,
+                    set requiresOwner=true and state one focused ownerQuestion. The system pauses Gabriel,
+                    creates the decision for your manager and relays the authoritative answer on resume.
+                    Never merely tell Gabriel to escalate. Never require a deadline or permission for forecast-driven planning.
+                    This policy supersedes legacy transcript guidance that demanded dates or owner permission
+                    solely because dates were absent. Withdraw those obsolete questions and assess planning readiness.
                     Set accept=true only if the Producer reports ready with no questions AND this exact draft
                     faithfully captures the pitch with enough scope, testable acceptance criteria, delivery sequence,
                     constraints and workload drivers to plan staffing. Missing detail or over-scoping requires revision.
@@ -50,10 +65,18 @@ public sealed partial class VideoGameCreativeDirectorAgent
             ], new ChatOptions { MaxOutputTokens = Math.Min(ResolvePitchOutputTokens(Settings), 8192) }, token);
             var result = PitchProtocol.ParseDirectorReview(response.Text);
             if (result is null || string.IsNullOrWhiteSpace(result.Guidance) || result.Guidance.Length > 16000 ||
-                result.SuggestedMarkdown is null || result.SuggestedMarkdown.Length > 48000)
+                result.SuggestedMarkdown is null || result.SuggestedMarkdown.Length > 48000 ||
+                result.RequiresOwner && (string.IsNullOrWhiteSpace(result.OwnerQuestion) || result.OwnerQuestion.Length > 3000))
                 throw new InvalidOperationException("The Creative Director must answer the Producer with bounded substantive guidance.");
             return result;
         }, token);
+        var repeated = request.Transcript.Where(x => x.SpeakerOrganizationUserId == request.Counterpart.OrganizationUserId &&
+                x.Artifact?.Type == PitchProtocol.ReviewType)
+            .Select(x => x.Artifact!.Payload.Deserialize<PitchReview>(PitchProtocol.Json))
+            .Count(x => x?.RevisionSha256 == review.RevisionSha256 && !x.Ready) >= 2;
+        if (answer.RequiresOwner || repeated && !review.Ready)
+            return await EscalatePitchAsync(request, state, review,
+                answer.OwnerQuestion ?? string.Join("\n", review.Questions), context, token);
         var accept = answer.Accept && review.Ready && review.Questions.Count == 0 && !string.IsNullOrWhiteSpace(review.Rationale);
         if (accept && revision.Status != "Accepted")
         {

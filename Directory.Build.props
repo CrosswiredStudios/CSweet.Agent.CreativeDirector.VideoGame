@@ -11,5 +11,8 @@
     <CSweetMemoryRepositoryRoot Condition="'$(CSweetMemoryRepositoryRoot)' == ''">$(MSBuildThisFileDirectory)..\CSweet.Memory</CSweetMemoryRepositoryRoot>
     <UseLocalCSweetMemory Condition="'$(UseLocalCSweetMemory)' == '' and Exists('$(CSweetMemoryRepositoryRoot)\src\CSweet.Memory\CSweet.Memory.csproj')">true</UseLocalCSweetMemory>
     <UseLocalCSweetMemory Condition="'$(UseLocalCSweetMemory)' == ''">false</UseLocalCSweetMemory>
+    <CSweetWorkManagementContractsRepositoryRoot Condition="'$(CSweetWorkManagementContractsRepositoryRoot)' == ''">$(MSBuildThisFileDirectory)..\CSweet.WorkManagement.Contracts</CSweetWorkManagementContractsRepositoryRoot>
+    <UseLocalCSweetWorkManagementContracts Condition="'$(UseLocalCSweetWorkManagementContracts)' == '' and Exists('$(CSweetWorkManagementContractsRepositoryRoot)\src\CSweet.WorkManagement.Contracts\CSweet.WorkManagement.Contracts.csproj')">true</UseLocalCSweetWorkManagementContracts>
+    <UseLocalCSweetWorkManagementContracts Condition="'$(UseLocalCSweetWorkManagementContracts)' == ''">false</UseLocalCSweetWorkManagementContracts>
   </PropertyGroup>
 </Project>

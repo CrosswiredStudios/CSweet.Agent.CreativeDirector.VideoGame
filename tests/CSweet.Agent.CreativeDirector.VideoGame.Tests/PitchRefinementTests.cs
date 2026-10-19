@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CSweet.Agent.SDK;
+using CSweet.WorkManagement.Contracts;
 using CrosswiredStudios.VideoGame.PitchCollaboration;
 
 namespace CSweet.Agent.CreativeDirector.VideoGame.Tests;
@@ -20,6 +21,8 @@ public sealed class PitchRefinementTests
             AcceptedVision = new(1, "pitch", "Accepted arcade pitch", Guid.NewGuid(), Guid.NewGuid(), "pitch-sha", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow) };
         var modelCalls = 0;
         var runtime = new AgentTestRuntime()
+            .RegisterCapability<ReadDecisionRequest, IReadOnlyList<DecisionRecord>>(DecisionCapabilityNames.ReadV1,
+                (_, _) => Task.FromResult<IReadOnlyList<DecisionRecord>>([]))
             .RegisterCapability<JsonElement, ArtifactDocument>(PlatformCapabilities.ArtifactRead, (_, _) => Task.FromResult(
                 new ArtifactDocument(document, "Planning", PitchProtocol.DocumentType, "InReview", revision, revision, null, null, null,
                     [new(revision, 1, null, markdown, "draft-hash", "Submitted", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null)]) { WorkstreamId = workstream, TeamId = team }))

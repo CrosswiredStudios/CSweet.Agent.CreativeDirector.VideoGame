@@ -23,6 +23,7 @@ public sealed partial class VideoGameCreativeDirectorAgent
 
     private async Task RelayPlanningDecisionAsync(DecisionRecord decision, AgentRuntimeContext context, CancellationToken token)
     {
+        if (PitchDecision(decision) is not null) return;
         if (decision.TypeKey != "video-game.management-direction.v1" || decision.Status != DecisionStatuses.Pending)
             return;
         var current = await ReadStateAsync(context, token, decision.WorkstreamId);

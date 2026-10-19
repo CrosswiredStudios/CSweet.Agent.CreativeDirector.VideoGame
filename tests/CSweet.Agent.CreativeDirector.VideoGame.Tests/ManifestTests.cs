@@ -17,6 +17,7 @@ public sealed class ManifestTests
 
         Assert.Equal(agent.AgentId, manifest.Id);
         Assert.Equal(agent.Version, manifest.Version);
+        Assert.Contains(manifest.Requires, x => x.Name == CommunicationCapabilities.CoordinationResume && x.Scope == "team");
         Assert.Equal(agent.Version, typeof(VideoGameCreativeDirectorAgent).Assembly.GetName().Version?.ToString(3));
         var contextWindow = Assert.Single(manifest.Configuration,
             field => field.Key == "maxContextWindowTokens");

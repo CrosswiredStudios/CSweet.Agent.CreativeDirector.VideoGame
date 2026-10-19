@@ -8,6 +8,52 @@ namespace CSweet.Agent.CreativeDirector.VideoGame.Tests;
 public sealed class CreativeDirectorInteractionTests
 {
     [Fact]
+    public async Task InitialPitchCreatesItsSourceTaskBeforeModelDispatch_EvenWhenGenerationFails()
+    {
+        var org = Guid.NewGuid(); var employee = Guid.NewGuid(); var manager = Guid.NewGuid();
+        var conversation = Guid.NewGuid(); var message = Guid.NewGuid(); var turn = Guid.NewGuid();
+        var key = VideoGameCreativeDirectorAgent.ProjectStateKey(null, conversation);
+        var stored = new Dictionary<string, AgentOperatingStateResponse>
+        {
+            [key] = OperatingState(key, new CreativeDirectorOperatingState
+            {
+                IntakeConversationId = conversation, IntakeChoiceAsked = true, Phase = CreativeDirectorPhase.Discovery
+            })
+        };
+        AddPersonalTodoItemRequest? added = null;
+        var calls = 0;
+        var runtime = new AgentTestRuntime()
+            .RegisterCapability<JsonElement, JsonElement>("platform.project-approval.read.v1",
+                (_, _) => Task.FromResult(JsonSerializer.SerializeToElement(Array.Empty<object>())))
+            .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(PlatformCapabilities.AgentOperatingStateRead,
+                (r, _) => Task.FromResult(new AgentOperatingStateReadResponse(stored.GetValueOrDefault(r.StateKey))))
+            .RegisterCapability<AgentOperatingStateWriteRequest, AgentOperatingStateResponse>(PlatformCapabilities.AgentOperatingStateWrite,
+                (r, _) => Task.FromResult(stored[r.StateKey] = OperatingState(r.StateKey, r.Payload)))
+            .RegisterCapability<AddPersonalTodoItemRequest, PersonalTodoItem>(PersonalTodoCapabilities.Add, (r, _) =>
+            {
+                added = r;
+                return Task.FromResult(PersonalItem(r.Title, r.CorrelationId!, conversation) with { SourceMessageId = message });
+            })
+            .RegisterCapability<JsonElement, JsonElement>(PlatformCapabilities.LlmChatStream, (_, _) =>
+            {
+                Assert.NotNull(added);
+                Assert.Equal(conversation, added.SourceConversationId);
+                Assert.Equal(message, added.SourceMessageId);
+                calls++;
+                throw new TimeoutException("Provider unavailable after dispatch.");
+            });
+        var context = runtime.CreateContext(org.ToString(), Guid.NewGuid().ToString(),
+            new AgentIdentity(employee.ToString(), "Creative Director", null, "Creative Director", null, [], null, manager.ToString(), "Owner"));
+        var incoming = new CommunicationMessageReceivedEvent(Guid.NewGuid(), conversation.ToString(), manager.ToString(),
+            "Create an arcade game pitch with a focused player fantasy and a clear core loop.",
+            new Dictionary<string, string> { [CommunicationMessageContextKeys.SenderOrganizationUserId] = manager.ToString() }, turn, 1, message);
+        await new VideoGameCreativeDirectorAgent().HandleEventAsync(new AgentEventEnvelope(Guid.NewGuid(), Guid.NewGuid(),
+            CommunicationEvents.MessageReceived, JsonSerializer.SerializeToElement(incoming), DateTimeOffset.UtcNow), context, default);
+        Assert.Equal(1, calls);
+        Assert.Equal($"high-level-gdd:{conversation:N}", added!.IdempotencyKey);
+    }
+
+    [Fact]
     public async Task ModelStreamingPublishesReasoningAndDraftToTheConversationTurn()
     {
         var runtime = new AgentTestRuntime().RegisterCapability<JsonElement, JsonElement>("platform.project-approval.read.v1",

@@ -38,10 +38,13 @@ public sealed record ManagerPreferenceProfile
     public IReadOnlyList<string> NarrativeConstraints { get; init; } = [];
     public string? StoryParticipation { get; init; }
     public string? ApprovalPreference { get; init; }
+    public IReadOnlyList<PlanningConstraintEvidence> PlanningConstraints { get; init; } = [];
     public IReadOnlyList<string> ReferenceGuidance { get; init; } = [];
     public IReadOnlyList<Guid> SupportingMessageIds { get; init; } = [];
     public DateTimeOffset? UpdatedAt { get; init; }
 }
+
+public sealed record PlanningConstraintEvidence(string Text, Guid MessageId, bool StandingPreference);
 
 public sealed record GamePitchRevision(
     int Revision,

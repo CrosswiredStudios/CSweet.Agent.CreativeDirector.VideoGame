@@ -19,9 +19,13 @@ internal sealed record PitchReview(string PitchDigest, Guid DocumentId, Guid Rev
     public IReadOnlyList<CollaborationDocumentReference> DocumentReferences => [new(DocumentId, RevisionId, RevisionSha256)];
 }
 internal sealed record PitchReply(string PitchDigest, Guid DocumentId, Guid RevisionId, string RevisionSha256,
-    bool Accepted, string Guidance, string SuggestedMarkdown);
+    bool Accepted, string Guidance, string SuggestedMarkdown)
+{
+    public Guid? OwnerDecisionId { get; init; }
+}
 internal sealed record ProducerReview(bool Ready, IReadOnlyList<string> Questions, string Rationale, string DraftMarkdown);
-internal sealed record DirectorReview(bool Accept, string Guidance, string SuggestedMarkdown);
+internal sealed record DirectorReview(bool Accept, string Guidance, string SuggestedMarkdown,
+    bool RequiresOwner = false, string? OwnerQuestion = null);
 
 internal static class PitchProtocol
 {

@@ -16,7 +16,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "Naomi Chen",
-  "version": "2.1.3",
+  "version": "2.1.5",
   "publisher": {
     "id": "com.csweet",
     "name": "C-Sweet"
@@ -501,6 +501,11 @@
       "name": "communication.coordination.read.v1",
       "scope": "team",
       "purpose": "Recover durable Producer and specialist coordination sessions."
+    },
+    {
+      "name": "communication.coordination.resume.v1",
+      "scope": "team",
+      "purpose": "Resume this manager's paused brief collaboration after reading an authoritative decision and relay its answer to the Producer."
     },
     {
       "name": "communication.coordination.list.v1",
