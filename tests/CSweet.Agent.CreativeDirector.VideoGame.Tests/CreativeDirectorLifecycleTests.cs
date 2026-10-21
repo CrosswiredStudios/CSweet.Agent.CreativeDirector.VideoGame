@@ -317,6 +317,35 @@ public sealed class CreativeDirectorLifecycleTests
             "A 2D web brick breaker with no named game engine."));
     }
 
+    [Theory]
+    [InlineData("Phaser 4", "Web browsers via Phaser 4.\n**Non-goals:** 3D rendering, multiplayer, Babylon.js or Godot.\n**Guardrails:**\n- Engine: Phaser 4.")]
+    [InlineData("Phaser 4", "## Engine\nPhaser 4.\n## Non-goals\n- Multiplayer\n- Babylon.js or Godot\n## Art\nNeon sprites.")]
+    [InlineData("Phaser 4", "Phaser 4.\n### 9. Out of scope\nBabylon.js, Godot, and multiplayer.\n#### Reasons\nBabylon.js requires a different renderer.\n### 10. Delivery\nWeb.")]
+    [InlineData("Phaser 4", "Phaser 4.\n- **Excluded engines:** Babylon.js and Godot.")]
+    [InlineData("Phaser 4", "Phaser 4.\nNon-goals:\n- Multiplayer\n- Babylon.js\nEngine: Phaser 4.")]
+    [InlineData("Babylon.js", "Engine: Babylon.js.\n**Non-goals:** Phaser, Godot, multiplayer.")]
+    [InlineData("latest Phaser", "Engine: latest compatible Phaser.\nNon-goals: Phaser 3 or Babylon.js.")]
+    public void PitchReviewAcceptsEngineNamesInExplicitExclusions(string requested, string pitch)
+    {
+        Assert.Null(VideoGameCreativeDirectorAgent.PitchEngineConflict(
+            new ManagerPreferenceProfile { EnginePreferences = [requested] }, pitch));
+    }
+
+    [Theory]
+    [InlineData("Phaser 4", "## Non-goals\nPhaser 4.\n## Engine\nBabylon.js.")]
+    [InlineData("Phaser 4", "Phaser 4.\n## Non-goals\nMultiplayer.\n## Engine\nBabylon.js.")]
+    [InlineData("Phaser 4", "Phaser 4.\nNon-goals: multiplayer; Engine: Babylon.js.")]
+    [InlineData("Phaser 4", "Phaser 4.\nNon-goals: multiplayer. Use Babylon.js instead.")]
+    [InlineData("Phaser 4", "Non-goals: Phaser 4 and Babylon.js.")]
+    [InlineData("Phaser 4", "Phaser 4.\nNon-goals:\n- Multiplayer\nEngine: Babylon.js.")]
+    [InlineData("latest Phaser", "Engine: Phaser 3.\nNon-goals: Babylon.js.")]
+    [InlineData("Babylon.js", "Babylon.js for rendering and Phaser for gameplay.")]
+    public void PitchReviewStillRejectsMissingOrSubstitutedEngines(string requested, string pitch)
+    {
+        Assert.NotNull(VideoGameCreativeDirectorAgent.PitchEngineConflict(
+            new ManagerPreferenceProfile { EnginePreferences = [requested] }, pitch));
+    }
+
     [Fact]
     public void ExplicitEngineIsIncludedInScopedProjectMemory()
     {

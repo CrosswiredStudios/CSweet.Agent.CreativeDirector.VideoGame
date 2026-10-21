@@ -15,10 +15,12 @@ public sealed partial class VideoGameCreativeDirectorAgent
         JsonElement Binding, Spending Spending, ProjectDecisionReceipt? Decision, JsonElement? Escalation);
     private sealed record ProjectVerdict(string DecisionKind, string Rationale);
 
-    private static JsonElement ProjectFoundationPayload(WorkstreamPlanProposalV2Request plan, Guid conversationId)
+    private static JsonElement ProjectFoundationPayload(WorkstreamPlanProposalV2Request plan, Guid conversationId,
+        InferredGameProject identity)
     {
         var fields = JsonSerializer.SerializeToElement(plan, ProjectApprovalJson).EnumerateObject().ToDictionary(x => x.Name, x => x.Value.Clone());
         fields["sourceConversationId"] = JsonSerializer.SerializeToElement(conversationId);
+        fields["projectIdentity"] = JsonSerializer.SerializeToElement(identity, ProjectApprovalJson);
         return JsonSerializer.SerializeToElement(fields);
     }
 

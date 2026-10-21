@@ -34,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "2.1.5";
+    public override string Version => "2.1.7";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -938,7 +938,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
                     exception is InvalidOperationException { Message: "The configured model returned an empty game pitch." }
                         ? $"Your game direction and {DescribeInvolvementMode(state.ManagerPreferences.InvolvementMode)} involvement preference are saved, but the model returned no pitch text. Its output budget may have been spent on reasoning. Check Maximum pitch output tokens and the provider's ceiling, then retry; you do not need to re-enter your direction."
                         : exception is InvalidOperationException { Message: EnginePitchConflictError }
-                            ? "Your game direction is saved, but the model twice contradicted your explicit engine choice. I did not submit that pitch for approval. Please retry after checking the model configuration; you do not need to re-enter your direction."
+                            ? "Your game direction is saved, but the pitch did not pass the engine-choice check after one correction. I did not submit it for approval. Please retry; you do not need to re-enter your direction."
                         : $"Your game direction and {DescribeInvolvementMode(state.ManagerPreferences.InvolvementMode)} involvement preference are saved, but the configured model timed out or was unavailable while generating the high-level vision. Retry this direction after checking the Creative Director's LLM provider; you do not need to re-enter it.",
                     cancellationToken);
                 return;
@@ -1108,7 +1108,9 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
             Reasoning = new ReasoningOptions { Effort = ReasoningEffort.Low, Output = ReasoningOutput.Full }
         }, cancellationToken);
         var corrected = repaired.Text?.Trim();
-        return string.IsNullOrWhiteSpace(corrected) || PitchEngineConflict(state.ManagerPreferences, corrected) is not null
+        if (string.IsNullOrWhiteSpace(corrected))
+            throw new InvalidOperationException("The configured model returned an empty game pitch.");
+        return PitchEngineConflict(state.ManagerPreferences, corrected) is not null
             ? throw new InvalidOperationException(EnginePitchConflictError)
             : corrected + "\n\n## Delivery planning\n" + PlanningContext(state.ManagerPreferences);
     }
@@ -1121,14 +1123,56 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         var phaser = HasAffirmativeMention(engine, @"\bphaser\b");
         var requested = phaser ? "Phaser" : "Babylon.js";
         var other = phaser ? @"\bbabylon(?:\.js)?\b" : @"\bphaser\b";
-        if (!HasAffirmativeMention(pitch, phaser ? @"\bphaser\b" : @"\bbabylon(?:\.js)?\b") ||
-            HasAffirmativeMention(pitch, other))
+        var constraintText = PitchConstraintText(pitch);
+        if (!HasAffirmativeMention(constraintText, phaser ? @"\bphaser\b" : @"\bbabylon(?:\.js)?\b") ||
+            HasAffirmativeMention(constraintText, other))
             return $"The manager explicitly chose {requested}; do not omit it or substitute another engine.";
         if (phaser && Regex.IsMatch(engine, @"(?i)\blatest\s+phaser\b") &&
-            Regex.IsMatch(pitch, @"(?i)\bphaser\s+v?\d+(?:\.\d+)*\b"))
+            Regex.IsMatch(constraintText, @"(?i)\bphaser\s+v?\d+(?:\.\d+)*\b"))
             return "The manager asked for the latest Phaser. Do not pin a major or package version before Technical Director compatibility validation.";
         return null;
     }
+
+    private static string PitchConstraintText(string pitch)
+    {
+        var included = new StringBuilder();
+        var exclusionHeadingLevel = 0;
+        var exclusionList = false;
+        foreach (var line in pitch.Split('\n'))
+        {
+            var heading = Regex.Match(line, @"^\s{0,3}(?<level>#{1,6})\s+(?<title>.+?)\s*#*\s*$");
+            if (heading.Success)
+            {
+                var level = heading.Groups["level"].Length;
+                if (exclusionHeadingLevel > 0 && level > exclusionHeadingLevel) continue;
+                exclusionHeadingLevel = IsExclusionLabel(heading.Groups["title"].Value) ? level : 0;
+                exclusionList = false;
+            }
+            if (exclusionHeadingLevel > 0) continue;
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            var listItem = Regex.Match(line, @"^\s*(?:[-+*]|\d+[.)])\s+");
+            if (exclusionList && listItem.Success) continue;
+            exclusionList = false;
+            var text = line[listItem.Length..].Replace("**", "").Replace("__", "");
+            // Exclusions end at a sentence or semicolon; a later engine choice still counts.
+            foreach (var clause in Regex.Split(text, @"(?<=\.)\s+|;"))
+            {
+                var label = Regex.Match(clause, @"^\s*(?<name>[^:]+):\s*(?<content>.*)$");
+                if (label.Success && IsExclusionLabel(label.Groups["name"].Value))
+                {
+                    exclusionList = string.IsNullOrWhiteSpace(label.Groups["content"].Value);
+                    continue;
+                }
+                if (!string.IsNullOrWhiteSpace(clause)) exclusionList = false;
+                included.AppendLine(clause);
+            }
+        }
+        return included.ToString();
+    }
+
+    private static bool IsExclusionLabel(string text) => Regex.IsMatch(
+        text.Replace("**", "").Replace("__", "").Trim(),
+        @"(?i)^(?:\d+[.)]\s*)?(?:non[- ]goals|out[- ]of[- ]scope|excluded(?: engines| alternatives)?):?$");
 
     private async Task<string> BuildCreativeGroundingAsync(
         string userId,
@@ -2220,6 +2264,11 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         }
         if (!state.WorkstreamProposalId.HasValue && !state.WorkstreamId.HasValue)
         {
+            // This required, evidence-bound step precedes every new project proposal. Existing
+            // proposals retain their immutable identity; legacy heading extraction is recovery only.
+            var projectVision = state.AcceptedVision ?? throw new InvalidOperationException("An accepted vision is required for project identity inference.");
+            var projectIdentity = await InferProjectIdentityAsync(projectVision, context, cancellationToken);
+            workingTitle = projectIdentity.Title;
             var metadata = new VideoGameProjectMetadataV1(
                 workingTitle,
                 state.ManagerPreferences.GenreConstraints.FirstOrDefault() ?? "To be confirmed during pre-production",
@@ -2237,7 +2286,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
             var now = DateTimeOffset.UtcNow;
             var projectPlan = new WorkstreamPlanProposalV2Request(
                 workingTitle,
-                $"Create {workingTitle} from the accepted creative brief, with a playable game and reviewed quality, accessibility, and release evidence.",
+                projectIdentity.Description,
                 ["A runnable game fulfills the accepted player promise.", "Creative, technical, quality, accessibility, and release gates have accepted evidence.", "Public launch occurs only after explicit human approval."],
                 VideoGameLifecyclePhases.Concept,
                 producerId,
@@ -2249,7 +2298,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
                 null,
                 null,
                 "Give the Producer a project to plan and deliver, connect the approved team and creative brief, and keep creative direction and major decisions under review.",
-                $"video-game-workstream:{state.AcceptedVision.Digest}",
+                $"video-game-workstream:{projectVision.Digest}",
                 VideoGameProfileKeys.ProductionV2,
                 6,
                 JsonSerializer.SerializeToElement(metadata, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
@@ -2260,17 +2309,17 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
                     ["creative-review", "work-planning", "routine-staffing", "build", "validation", "preview", "evaluation", "gate-submit", ProductionStrategyAuthority, CertifiedToolchainAuthority],
                     null),
                 BuildLifecycleMilestones(now),
-                [new EvidenceReference("artifact", state.AcceptedVision.ArtifactId,
-                    state.AcceptedVision.ArtifactRevisionId, state.AcceptedVision.ArtifactRevisionHash,
+                [new EvidenceReference("artifact", projectVision.ArtifactId,
+                    projectVision.ArtifactRevisionId, projectVision.ArtifactRevisionHash,
                     VideoGameArtifactTypeKeys.Vision, "Accepted")]);
             var projectSession = await context.Platform.Communication.StartCoordinationAsync(new StartAgentCoordinationRequest(
                 producerId, "Propose the accepted game project", "Prepare a project proposal from the accepted direction for manager review.",
                 ["An exact project proposal is reviewed by its assigned manager"],
-                "Analyze the project template and accepted evidence. Submit the project proposal as Producer and return its approval ID for my review.",
-                state.AcceptedVision.ConversationId, state.AcceptedVision.ChatTurnId, state.AcceptedVision.MessageId,
-                $"project-foundation:{state.AcceptedVision.Digest}",
-                CollaborationActions.WithDocuments(new AgentCoordinationArtifactSubmission("video-game.project-foundation.request.v1", "1.0", state.AcceptedVision.Digest, 1, true,
-                    ProjectFoundationPayload(projectPlan, state.AcceptedVision.ConversationId)), projectPlan.InitialEvidence.Where(x => x.Kind == "artifact").Select(x => new CollaborationDocumentReference(x.ResourceId, x.RevisionId!.Value, x.Digest!)).ToArray())), cancellationToken);
+                "Analyze the project template and accepted evidence. Preserve the inferred game title and product description. Submit the project proposal as Producer and return its approval ID for my review.",
+                projectVision.ConversationId, projectVision.ChatTurnId, projectVision.MessageId,
+                $"project-foundation:{projectVision.Digest}",
+                CollaborationActions.WithDocuments(new AgentCoordinationArtifactSubmission("video-game.project-foundation.request.v1", "1.0", projectVision.Digest, 1, true,
+                    ProjectFoundationPayload(projectPlan, projectVision.ConversationId, projectIdentity)), projectPlan.InitialEvidence.Where(x => x.Kind == "artifact").Select(x => new CollaborationDocumentReference(x.ResourceId, x.RevisionId!.Value, x.Digest!)).ToArray())), cancellationToken);
             state = state with
             {
                 WorkingTitle = workingTitle,
@@ -2278,7 +2327,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
                 Phase = CreativeDirectorPhase.WorkstreamPlanPending
             };
             var saved = await SaveStateAsync(state, revision, reviewId,
-                $"workstream-proposed:{state.AcceptedVision.Digest}", context, cancellationToken);
+                $"workstream-proposed:{projectVision.Digest}", context, cancellationToken);
             RequireProgressingHandoff(projectSession, "Project proposal");
             return (saved.State, saved.Revision, false);
         }

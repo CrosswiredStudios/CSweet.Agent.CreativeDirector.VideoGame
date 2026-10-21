@@ -7,7 +7,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `2.1.5`
+- Version: `2.1.7`
 
 Package reviews use existing file permissions. Naomi requests an exact-file read or decision grant
 only after the platform denies that operation, and waits for access before escalating milestone review.
@@ -69,6 +69,25 @@ membership. The Producer proposes further roles from scoped work and capability 
 `creative-direction.game-vision-brief.v1` artifact,
 and enters oversight only after an exact-digest, blocker-free
 `product-management.game-vision-acknowledgement.v1` response.
+
+Before each new project proposal, `InferProjectIdentityAsync` infers the actual game title and a
+player-facing marketing blurb from the exact accepted vision. The blurb leads with the hook,
+gameplay and appeal instead of summarizing the pitch or the delivery process, and makes only
+promises grounded in the accepted scope. The required step validates bounded
+plain-text fields, corrects invalid output once, and saves the result before Producer coordination.
+Duplicate wakes and interrupted handoffs reuse the saved identity; a different accepted revision
+gets a separate inference. Invalid output blocks setup without falling back to a document heading
+or generic delivery description. A corrected model configuration can retry a failed inference.
+The foundation payload binds `projectIdentity` to the template's name and outcome; Producer 4.0.8
+preserves those fields while refining delivery planning. Upgrade both agents through published
+releases and Installed Agents. Existing proposals and approved projects retain their current identity.
+
+`PitchEngineConflict` checks the manager's explicit engine choice before submitting a pitch.
+`PitchConstraintText` excludes clearly labeled non-goal/out-of-scope sections and lists from
+that check, so describing an excluded engine does not count as choosing it. Following sections
+and clauses still participate in validation; omitted or substituted engines remain rejected.
+This validation uses the same path for every model and adds no model-specific prompt rules.
+An empty corrective response is reported as empty output rather than an engine contradiction.
 
 During oversight it answers creative questions, escalates decisions owned by other roles, relays the
 manager's answer to the original worker, consumes subordinate status reports, and emits attributed

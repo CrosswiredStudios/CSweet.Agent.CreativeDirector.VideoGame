@@ -134,6 +134,11 @@ public sealed class ProductionCommitmentTests
         WorkstreamPlanProposalV2Request? plan = null;
         DecisionRequest? decision = null;
         var runtime = new AgentTestRuntime()
+            .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(PlatformCapabilities.AgentOperatingStateRead,
+                (r, _) => Task.FromResult(new AgentOperatingStateReadResponse(new(Guid.NewGuid(), r.StateKey, "test", 1, "Active",
+                    new Dictionary<string, string>(), [], "identity", [], Guid.NewGuid(),
+                    JsonSerializer.SerializeToElement(new InferredGameProject("Gridlock", "A local web arena.")),
+                    1, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow))))
             .RegisterCapability<StartAgentCoordinationRequest, JsonElement>(CommunicationCapabilities.CoordinationStart, (r, _) => {
                 plan = r.Artifact!.Payload.Deserialize<WorkstreamPlanProposalV2Request>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
                 return Task.FromException<JsonElement>(new InvalidOperationException("captured")); })
