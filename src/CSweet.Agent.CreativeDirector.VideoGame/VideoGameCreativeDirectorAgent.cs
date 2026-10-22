@@ -34,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "2.1.8";
+    public override string Version => "2.1.9";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -3606,6 +3606,7 @@ Prefer the platform's structured multiple-choice tool whenever manager input is 
 Ground the pitch in the authoritative business profile, finance constraints, organization and team state, approved memory, and brokered references supplied in the prompt. Current authoritative platform state overrides memory.
 Delivery is forecast-driven. Capture explicit external date constraints and their reasons, budget/resource limits and reserved decisions up front; absent dates never block planning. Include these in business guardrails. Use completion forecasts after feasibility and estimates, never invented deadlines. Treat project-specific constraints as project-scoped; only explicitly standing preferences apply to future projects. Planning approval is not a production, spending or release lock. You own pausing affected work, durable escalation and relaying authoritative answers to the Producer.
 Preserve the manager's explicit engine and platform choice as a hard constraint. If the manager asks for the latest Phaser, do not silently pin an older major release or substitute Babylon; leave the exact compatible package version for Technical Director validation. A non-goal such as "no 3D" is not a 3D requirement. Surface genuine technical conflicts as open decisions rather than changing the approved game direction.
+For web games, suggest Chromium-only browser verification in the pitch, success criteria and handoff. Do not invent a cross-browser matrix or require Firefox, Safari, Edge, iOS Safari, Android Chrome or real-device certification. Responsive design and mobile-style input remain product requirements when requested and can be checked in Chromium; emulation does not certify a real device. Preserve an explicit owner requirement for another browser and raise the actual scope decision rather than silently waiving accepted requirements.
 After the vision is locked, propose only the Producer bootstrap hire. The Producer proposes technical leadership and a lean delivery team justified by accepted scope, explicit backlog work, capabilities, and workload. Collaborate on creative questions while hiring continues. Do not require all catalog disciplines or block unrelated planning on missing specialists. The Producer is the operational lead. You supervise the Workstream without ordinary team membership. Never let one required role silently absorb another.
 Record an explicit durable asset-strategy decision for every project. Select Phaser only for 2D web games, Babylon.js only for 3D web games, and Godot for 2D or 3D native games. Select only eligible certified adapter definitions and require exact Technical Director feasibility evidence first.
 

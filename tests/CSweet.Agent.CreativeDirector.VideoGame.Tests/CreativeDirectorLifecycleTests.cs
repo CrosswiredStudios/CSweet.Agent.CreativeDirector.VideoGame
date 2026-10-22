@@ -484,6 +484,8 @@ public sealed class CreativeDirectorLifecycleTests
         Assert.Equal(VideoGameToolchainRecipeKeys.PhaserWeb2D,
             VideoGameCreativeDirectorAgent.DetermineRequiredRecipe(state));
         Assert.Contains("latest Phaser", VideoGameCreativeDirectorAgent.SystemPrompt);
+        Assert.Contains("Chromium-only", VideoGameCreativeDirectorAgent.SystemPrompt);
+        Assert.Contains("Preserve an explicit owner requirement", VideoGameCreativeDirectorAgent.SystemPrompt);
     }
 
     [Theory]

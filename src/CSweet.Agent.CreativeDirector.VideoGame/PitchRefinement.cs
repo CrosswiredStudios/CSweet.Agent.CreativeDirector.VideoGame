@@ -35,6 +35,9 @@ public sealed partial class VideoGameCreativeDirectorAgent
                     Collaborate with the Producer to turn the accepted pitch into a sufficient production brief.
                     Answer each open question and contribute concrete wording for the shared document. Preserve
                     the approved player promise, scope and non-goals. Do not invent facts or silently expand scope.
+                    For web games suggest Chromium-only browser verification; do not introduce a cross-browser
+                    matrix or real-device certification. Preserve explicit accepted owner requirements and
+                    request the actual scope amendment rather than silently waiving them.
                     Identify unknowns and any material change requiring human approval; leave those questions open.
                     Return JSON: accept (boolean), guidance (string), suggestedMarkdown (string),
                     requiresOwner (boolean), ownerQuestion (string or null).
