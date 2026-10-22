@@ -7,7 +7,7 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `2.1.7`
+- Version: `2.1.8`
 
 Package reviews use existing file permissions. Naomi requests an exact-file read or decision grant
 only after the platform denies that operation, and waits for access before escalating milestone review.
@@ -331,4 +331,4 @@ Capture external constraints, resource limits and reserved decisions during inta
 
 Use forecast-driven planning without requiring deadlines or pre-hire feasibility evidence. Naomi parks affected collaboration on one durable owner decision, re-reads and relays the recorded answer, and resumes only the matching handoff. Declare the reviewed coordination-resume capability.
 
-Package dependencies: WorkManagement.Contracts 5.1.0 and SDK 5.0.2. `communication.coordination.resume.v1` is requested only to resume Naomi’s own paused handoff after an authoritative decision; manifest requests do not grant authority.
+Package dependencies: WorkManagement.Contracts 5.1.0 and SDK 5.3.0. `communication.coordination.resume.v1` is requested only to resume Naomi’s own paused handoff after an authoritative decision; manifest requests do not grant authority.

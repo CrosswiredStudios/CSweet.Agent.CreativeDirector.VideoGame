@@ -72,7 +72,8 @@ internal static class PitchProtocol
         try
         {
             await context.Platform.WriteOperatingStateAsync(new AgentOperatingStateWriteRequest(key,
-                "video-game.pitch-turn.v1", 1, "Active", new Dictionary<string, string>(), [], key, [], Guid.NewGuid(),
+                "video-game.pitch-turn.v1", 1, "Active", new Dictionary<string, string>(), [],
+                CSweet.Agent.CreativeDirector.VideoGame.VideoGameCreativeDirectorAgent.Digest(key), [], Guid.NewGuid(),
                 JsonSerializer.SerializeToElement(value), null, key), token);
         }
         catch (PlatformCapabilityException ex) when (ex.Code == PlatformCapabilityErrorCode.Conflict)

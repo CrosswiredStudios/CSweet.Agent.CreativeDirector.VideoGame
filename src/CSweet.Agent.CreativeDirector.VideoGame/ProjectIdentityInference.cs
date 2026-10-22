@@ -16,21 +16,20 @@ public sealed partial class VideoGameCreativeDirectorAgent
         AcceptedGameVision vision, AgentRuntimeContext context, CancellationToken token)
     {
         // Bind the decision to the exact accepted evidence, not a heading or a mutable working title.
-        var source = Digest(JsonSerializer.Serialize(new {
+        var key = AgentOperatingStateKey.Create("game-project-identity:v1", new {
             vision.ArtifactId, vision.ArtifactRevisionId, vision.ArtifactRevisionHash, vision.Digest,
             contentDigest = Digest(vision.Markdown)
-        }));
-        var key = $"game-project-identity:v1:{source}";
+        });
         var accepted = await context.Platform.ReadOperatingStateAsync<InferredGameProject>(key, token);
         if (accepted is not null) return RequireProjectIdentity(accepted.Payload);
 
         var provider = Settings.GetGuid("llmProviderId")
             ?? throw new InvalidOperationException("Configure the Creative Director model to infer the project title and description.");
         var modelName = Settings.GetString("llmModel");
-        var attempt = Digest(JsonSerializer.Serialize(new { provider, modelName }));
+        var attemptKey = AgentOperatingStateKey.Create("game-project-identity-attempt:v1", new { key, provider, modelName });
         // Retain terminal invalid output too: duplicate wakes cannot restart the correction budget.
         // A model configuration change allows another attempt; an accepted result always wins.
-        var result = await PitchProtocol.CachedAsync($"{key}:attempt:{attempt}", context, async () =>
+        var result = await PitchProtocol.CachedAsync(attemptKey, context, async () =>
         {
             var client = context.CreateChatClient(new AgentLlmSelection(provider, modelName,
                 new AgentLlmInvocationContext(null, null, "creative-director-project-identity")));

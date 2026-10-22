@@ -111,6 +111,25 @@ public sealed class ProjectIdentityInferenceTests
         Assert.Equal(3, journey.Models);
     }
 
+    [Fact]
+    public async Task AttemptKeysStayBoundedAcrossModelsAndAcceptedLegacyIdentityIsReused()
+    {
+        var journey = await Journey.CreateAsync(JsonSerializer.Serialize(new { title = "RESONANCE", description = Description }));
+        await journey.ConfigureAsync(new string('x', 500));
+        var identity = await journey.Agent.InferProjectIdentityAsync(journey.Vision, journey.Context, default);
+        var vision = journey.Vision;
+        var legacyKey = "game-project-identity:v1:" + VideoGameCreativeDirectorAgent.Digest(JsonSerializer.Serialize(new {
+            vision.ArtifactId, vision.ArtifactRevisionId, vision.ArtifactRevisionHash, vision.Digest,
+            contentDigest = VideoGameCreativeDirectorAgent.Digest(vision.Markdown)
+        }));
+        Assert.Contains(legacyKey, journey.States.Keys);
+        Assert.Contains(journey.States.Keys, x => x.StartsWith("game-project-identity-attempt:v1:") && x.Length <= 128);
+        Assert.All(journey.States.Keys, key => Assert.True(AgentOperatingStateKey.IsValid(key)));
+        await journey.ConfigureAsync("a-different-model");
+        Assert.Equal(identity, await journey.Agent.InferProjectIdentityAsync(vision, journey.Context, default));
+        Assert.Equal(1, journey.Models);
+    }
+
     private sealed class Journey
     {
         public VideoGameCreativeDirectorAgent Agent { get; } = new();
@@ -118,6 +137,7 @@ public sealed class ProjectIdentityInferenceTests
         public int Models { get; private set; }
         public List<JsonElement> ModelRequests { get; } = [];
         public List<StartAgentCoordinationRequest> Handoffs { get; } = [];
+        public Dictionary<string, AgentOperatingStateResponse> States { get; } = [];
         public AcceptedGameVision Vision { get; } = new(1, "pitch-digest", "# RESONANCE — Game Pitch\nA musical brick-breaker.",
             Guid.NewGuid(), Guid.NewGuid(), "accepted-hash", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow);
         public CreativeDirectorOperatingState State => new() { AcceptedVision = Vision, TeamId = _team, ProducerEmployeeId = _producer };
@@ -126,7 +146,7 @@ public sealed class ProjectIdentityInferenceTests
         public static async Task<Journey> CreateAsync(params string[] responses)
         {
             var journey = new Journey();
-            var states = new Dictionary<string, AgentOperatingStateResponse>();
+            var states = journey.States;
             var pending = new Queue<string>(responses);
             var runtime = new AgentTestRuntime()
                 .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(PlatformCapabilities.AgentOperatingStateRead,
