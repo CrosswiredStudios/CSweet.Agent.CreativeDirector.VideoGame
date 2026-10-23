@@ -34,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "2.1.9";
+    public override string Version => "2.1.10";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -97,6 +97,14 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
                 foreach (var decision in decisions)
                     await RelayPlanningDecisionAsync(decision, context, cancellationToken);
             }
+            return;
+        }
+
+        if (message.EventType is "com.csweet.work.item.changed.v1" or "com.csweet.work.execution.changed.v1" or "com.csweet.work.sprint.changed.v1")
+        {
+            var hint = DeserializePayload<GenericResourceEvent>(message.Data);
+            if (hint?.Context.WorkstreamId is { } project && hint.Context.BoardId is { } board)
+                await WakePlanningFollowthroughAsync(project, board, context, cancellationToken);
             return;
         }
 
@@ -222,6 +230,8 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
             await ReconcilePitchDecisionAsync(current.State, context, cancellationToken);
             return;
         }
+        if (decision.TypeKey == "video-game.management-direction.v1")
+            await WakePlanningFollowthroughAsync(decision.WorkstreamId, null, context, cancellationToken);
         await WakeProductionCommitmentAsync(current.State, decision.TypeKey, context, cancellationToken);
         var waiting = current.State.PendingEscalations.Where(x => x.DecisionId == decision.Id && !x.Relayed).ToList();
         if (waiting.Count == 0) return;
@@ -281,6 +291,8 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (item.CorrelationId?.StartsWith(PlanningFollowthroughPrefix, StringComparison.Ordinal) == true)
+            return await HandlePlanningFollowthroughAsync(item, context, cancellationToken);
         if (item.CorrelationId?.StartsWith(ProducerDocumentsPrefix, StringComparison.Ordinal) == true)
             return await PrepareProducerDocumentationAsync(item, context, cancellationToken);
         if (item.CorrelationId?.StartsWith(ProductionCommitmentPrefix, StringComparison.Ordinal) == true)
