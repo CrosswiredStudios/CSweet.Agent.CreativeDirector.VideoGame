@@ -16,7 +16,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "Naomi Chen",
-  "version": "2.1.9",
+  "version": "2.1.11",
   "publisher": {
     "id": "com.csweet",
     "name": "C-Sweet"
@@ -666,6 +666,11 @@
       "name": "work.item.comment.delete.v1",
       "scope": "organization",
       "purpose": "Retract this agent's own creative-direction comment while its activity history is retained."
+    },
+    {
+      "name": "work.orchestration.read",
+      "scope": "team",
+      "purpose": "Verify completed independent QA and exact integrated candidate evidence before resolving project planning decisions."
     },
     {
       "name": "work.sprint.read",

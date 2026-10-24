@@ -1,5 +1,14 @@
 # C-Sweet Video Game Creative Director
 
+Planning decisions retain durable follow-up work linked to the exact project decision.
+`PlanningFollowthrough` reads current completed integration and independent QA evidence
+through team-scoped `work.orchestration.read`. It checks repository, candidate commit,
+criteria and captured command output before presenting evidence for a decision.
+Recommendations and successful callbacks cannot substitute for a recorded direction.
+Project work and decision events wake waiting follow-ups; bounded reviews recover
+missed events. Decisions resume Producer planning through the durable decision event;
+sprint estimates, readiness and preflight remain required.
+
 Provide durable video game vision and creative leadership from discovery through pitch approval, dedicated-studio formation, certified-toolchain selection, and production oversight.
 
 `ReviewProducerPitchAsync` requests concise answers and exact edits with an 8192-token ceiling, respecting a lower configured budget. Conversation text is sent without repeated artifact payloads. Acceptance of an unchanged submitted brief needs no replacement Markdown; the Producer's confidence and exact revision checks still gate staffing.
@@ -7,7 +16,12 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `2.1.9`
+- Version: `2.1.11`
+
+Project-bound coordination and production commitments select their exact Workstream state before
+portfolio discovery. Conversation reads follow the promoted project route, and delayed intake
+writes cannot demote that route. Brief acceptance and staffing still require the original exact
+direction, assigned Producer and project/team evidence.
 
 Package reviews use existing file permissions. Naomi requests an exact-file read or decision grant
 only after the platform denies that operation, and waits for access before escalating milestone review.

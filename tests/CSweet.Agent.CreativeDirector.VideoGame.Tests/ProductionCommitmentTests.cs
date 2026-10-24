@@ -18,6 +18,8 @@ public sealed class ProductionCommitmentTests
             null, 1, now, now);
         DecideDecisionRequest? submitted = null;
         var runtime = new AgentTestRuntime()
+            .RegisterCapability<ReadDecisionRequest, IReadOnlyList<DecisionRecord>>(PlatformCapabilities.DecisionRead,
+                (_, _) => Task.FromResult<IReadOnlyList<DecisionRecord>>([decision]))
             .RegisterCapability<DecideDecisionRequest, DecisionRecord>(PlatformCapabilities.DecisionDecide,
                 (request, _) => { submitted = request; return Task.FromResult(decision); });
         await new VideoGameCreativeDirectorAgent().DecideProducerPlanningAsync(decision,
