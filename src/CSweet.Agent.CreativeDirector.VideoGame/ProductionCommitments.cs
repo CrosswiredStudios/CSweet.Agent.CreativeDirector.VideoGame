@@ -30,7 +30,9 @@ public sealed partial class VideoGameCreativeDirectorAgent
     private async Task<PersonalTodoResult> HandleProductionCommitmentAsync(PersonalTodoItem item,
         AgentRuntimeContext context, CancellationToken token)
     {
-        var current = await ReadStateForConversationAsync(item.SourceConversationId, context, token);
+        var current = item.WorkContext?.WorkstreamId is { } projectId
+            ? await ReadStateAsync(context, token, projectId)
+            : await ReadStateForConversationAsync(item.SourceConversationId, context, token);
         if (current.State.WorkstreamId is null || current.State.AcceptedVision is null)
             return PersonalTodoResult.Blocked("An approved project and accepted direction are required for production decisions.");
         try

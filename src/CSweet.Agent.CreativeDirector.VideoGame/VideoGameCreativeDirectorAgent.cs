@@ -34,7 +34,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
     ];
 
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "2.1.10";
+    public override string Version => "2.1.11";
 
     protected override AgentConfigurationBuilder Configure(AgentConfigurationBuilder builder) => builder
         .LlmProvider("llmProviderId", "LLM provider", required: true,
@@ -2756,11 +2756,15 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         };
     }
 
-    private async Task<(CreativeDirectorOperatingState State, long? Revision)> ReadStateForCoordinationAsync(
+    internal async Task<(CreativeDirectorOperatingState State, long? Revision)> ReadStateForCoordinationAsync(
         AgentCoordinationTurnRequest request,
         AgentRuntimeContext context,
         CancellationToken cancellationToken)
     {
+        // The authenticated project context takes precedence over portfolio discovery,
+        // including while the team has no board and intake recovery is still running.
+        if (request.WorkContext?.WorkstreamId is { } projectId)
+            return await ReadStateAsync(context, cancellationToken, projectId);
         var boardId = request.WorkSource?.BoardId ?? request.BoardSource?.BoardId;
         if (boardId.HasValue)
         {
@@ -2854,14 +2858,16 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         };
     }
 
-    private async Task<(CreativeDirectorOperatingState State, long? Revision)> ReadStateAsync(
+    internal async Task<(CreativeDirectorOperatingState State, long? Revision)> ReadStateAsync(
         AgentRuntimeContext context,
         CancellationToken cancellationToken,
         Guid? workstreamId = null,
         Guid? conversationId = null)
     {
-        if (workstreamId.HasValue || conversationId.HasValue)
+        if (workstreamId.HasValue)
             return await ReadStateByKeyAsync(ProjectStateKey(workstreamId, conversationId), context, cancellationToken);
+        if (conversationId.HasValue)
+            return await ReadStateForConversationAsync(conversationId, context, cancellationToken);
 
         var index = await ReadPortfolioIndexAsync(context, cancellationToken);
         if (index.Projects.Count == 1)
@@ -3007,7 +3013,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         };
     }
 
-    private static async Task UpsertPortfolioIndexAsync(
+    internal static async Task UpsertPortfolioIndexAsync(
         CreativeDirectorOperatingState state,
         string stateKey,
         AgentRuntimeContext context,
@@ -3028,10 +3034,8 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         var entry = new CreativeDirectorPortfolioEntry(
             stateKey, state.WorkstreamId, conversationId.Value, state.TeamId, state.BoardId,
             state.WorkingTitle ?? $"Game {conversationId.Value.ToString("N")[..8]}", state.Phase, DateTimeOffset.UtcNow);
-        var projects = (current?.Payload.Projects ?? [])
-            .Where(x => x.ConversationId != entry.ConversationId &&
-                        (!entry.WorkstreamId.HasValue || x.WorkstreamId != entry.WorkstreamId))
-            .Append(entry).OrderByDescending(x => x.UpdatedAt).Take(100).ToList();
+        var projects = MergePortfolioEntry(current?.Payload.Projects ?? [], entry);
+        if (ReferenceEquals(projects, current?.Payload.Projects)) return;
         try
         {
             _ = await context.Platform.WriteOperatingStateAsync(
@@ -3045,10 +3049,8 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
         catch (PlatformCapabilityException exception) when (exception.Code == PlatformCapabilityErrorCode.Conflict)
         {
             var latest = await context.Platform.ReadOperatingStateAsync<CreativeDirectorPortfolioIndex>(PortfolioStateKey, cancellationToken);
-            var merged = (latest?.Payload.Projects ?? [])
-                .Where(x => x.ConversationId != entry.ConversationId &&
-                            (!entry.WorkstreamId.HasValue || x.WorkstreamId != entry.WorkstreamId))
-                .Append(entry).OrderByDescending(x => x.UpdatedAt).Take(100).ToList();
+            var merged = MergePortfolioEntry(latest?.Payload.Projects ?? [], entry);
+            if (ReferenceEquals(merged, latest?.Payload.Projects)) return;
             _ = await context.Platform.WriteOperatingStateAsync(
                 new WriteAgentOperatingStateRequest<CreativeDirectorPortfolioIndex>(
                     PortfolioStateKey, "com.csweet.video-game-creative-director.portfolio.v1", 1, "Active",
@@ -3057,6 +3059,19 @@ public sealed partial class VideoGameCreativeDirectorAgent : CSweetManagerAgentB
                     new CreativeDirectorPortfolioIndex { Projects = merged }, latest?.Revision,
                     $"portfolio-index-merge:{entry.ConversationId:N}:{state.Phase}"), cancellationToken);
         }
+    }
+
+    internal static IReadOnlyList<CreativeDirectorPortfolioEntry> MergePortfolioEntry(
+        IReadOnlyList<CreativeDirectorPortfolioEntry> projects, CreativeDirectorPortfolioEntry entry)
+    {
+        var promoted = projects.SingleOrDefault(x => x.ConversationId == entry.ConversationId && x.WorkstreamId.HasValue);
+        // Historical intake writes remain valid history, but cannot demote current routing.
+        if (promoted is not null && !entry.WorkstreamId.HasValue) return projects;
+        if (promoted is not null && promoted.WorkstreamId != entry.WorkstreamId)
+            throw new InvalidOperationException("The project conversation is already bound to another Workstream.");
+        return projects.Where(x => x.ConversationId != entry.ConversationId &&
+                (!entry.WorkstreamId.HasValue || x.WorkstreamId != entry.WorkstreamId))
+            .Append(entry).OrderByDescending(x => x.UpdatedAt).Take(100).ToList();
     }
 
     internal static bool IsCreativeQuestion(string value) =>

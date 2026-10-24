@@ -16,7 +16,12 @@ Provide durable video game vision and creative leadership from discovery through
 ## Contract
 
 - Package ID: `com.csweet.video-game-creative-director`
-- Version: `2.1.10`
+- Version: `2.1.11`
+
+Project-bound coordination and production commitments select their exact Workstream state before
+portfolio discovery. Conversation reads follow the promoted project route, and delayed intake
+writes cannot demote that route. Brief acceptance and staffing still require the original exact
+direction, assigned Producer and project/team evidence.
 
 Package reviews use existing file permissions. Naomi requests an exact-file read or decision grant
 only after the platform denies that operation, and waits for access before escalating milestone review.
