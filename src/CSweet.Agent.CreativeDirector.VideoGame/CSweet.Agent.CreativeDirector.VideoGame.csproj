@@ -1,12 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <Version>2.1.9</Version>
+    <Version>4.0.0</Version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CSweet.WorkManagement.Contracts" Version="5.1.0" Condition="'$(UseLocalCSweetWorkManagementContracts)' != 'true'" />
-    <PackageReference Include="CSweet.Agent.SDK" Version="5.3.0" Condition="'$(UseLocalCSweetAgentSdk)' != 'true'" />
+    <PackageReference Include="CSweet.Agent.SDK" Version="5.5.0" Condition="'$(UseLocalCSweetAgentSdk)' != 'true'" />
     <PackageReference Include="CSweet.Memory" Version="0.5.0" Condition="'$(UseLocalCSweetMemory)' != 'true'" />
     <PackageReference Include="CSweet.Memory.Broker" Version="0.5.0" Condition="'$(UseLocalCSweetMemory)' != 'true'" />
   </ItemGroup>
@@ -26,10 +26,6 @@
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
     <Content Include="..\..\csweet-plugin.json" Link="csweet-plugin.json" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="content\" />
-    <Content Include="..\..\profiles\video-game-production.v2.5.json" Link="profiles\video-game-production.v2.5.json"
-             CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="content\profiles\" />
-    <Content Include="..\..\profiles\video-game-production.v2.6.json" Link="profiles\video-game-production.v2.6.json"
-             CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="content\profiles\" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="../../extensions/video-game/*.cs" Link="Extension/%(Filename)%(Extension)" />

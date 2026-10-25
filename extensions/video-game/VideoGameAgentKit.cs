@@ -194,6 +194,7 @@ public abstract class VideoGameSpecialistAgentBase : CSweetAgentBase
     public string DeclaredRoleKey => RoleKey;
     protected abstract string ArtifactTypeKey { get; }
     protected abstract string RolePrompt { get; }
+    protected virtual Guid? ArtifactReviewer(AgentRuntimeContext context) => null;
     protected abstract IReadOnlyList<string> RequiredSections { get; }
     public string PrimaryCapability => WorkManagementCapabilityNames.ExecutionRun;
 
@@ -461,11 +462,11 @@ public abstract class VideoGameSpecialistAgentBase : CSweetAgentBase
             var artifact = await context.Platform.Artifacts.CreateAsync(new CreateArtifactDocument(
                 $"{RoleKey}: {itemTypeKey}", markdown, ArtifactTypeKey,
                 $"artifact:{assignment.StageExecutionId:N}:{assignment.AttemptId:N}",
-                OriginWorkItemId: assignment.TaskItemId)
+                OriginWorkItemId: assignment.TaskItemId, StewardOrganizationUserId: ArtifactReviewer(context))
             { WorkstreamId = workstreamId, TeamId = canonicalInput.TeamId }, cancellationToken);
             var revision = artifact.Revisions.Single(x => x.Id == artifact.LatestRevisionId);
             await context.Platform.Artifacts.SubmitAsync(new SubmitArtifactRevision(artifact.Id, revision.Id,
-                $"submit:{assignment.StageExecutionId:N}:{revision.Id:N}"), cancellationToken);
+                $"submit:{assignment.StageExecutionId:N}:{revision.Id:N}", ReviewerOrganizationUserId: ArtifactReviewer(context)), cancellationToken);
             var evidence = new EvidenceReference("ArtifactRevision", artifact.Id, revision.Id, revision.ContentSha256,
                 ArtifactTypeKey, "Submitted");
             var delivery = new SpecialistDelivery(
