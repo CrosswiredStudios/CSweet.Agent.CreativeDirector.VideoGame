@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <Version>2.1.11</Version>
+    <Version>3.0.0</Version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
@@ -26,10 +26,6 @@
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
     <Content Include="..\..\csweet-plugin.json" Link="csweet-plugin.json" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="content\" />
-    <Content Include="..\..\profiles\video-game-production.v2.5.json" Link="profiles\video-game-production.v2.5.json"
-             CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="content\profiles\" />
-    <Content Include="..\..\profiles\video-game-production.v2.6.json" Link="profiles\video-game-production.v2.6.json"
-             CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="content\profiles\" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="../../extensions/video-game/*.cs" Link="Extension/%(Filename)%(Extension)" />

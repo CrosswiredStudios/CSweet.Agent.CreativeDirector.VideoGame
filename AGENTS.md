@@ -2,11 +2,11 @@
 
 This repository contains one standalone C-Sweet protocol-v2 agent. Its purpose is:
 
-> Provide durable video game vision and creative leadership from discovery through pitch approval, product-manager handoff, and production oversight.
+> Provide creative direction, GDDs and creative reviews under the Video Game Director, within exact CEO-approved game pitches. Do not own hiring plans, supervise the Producer, or approve project setup.
 
 ## Invariants
 
-- Keep `com.csweet.video-game-creative-director` and version `2.1.11` synchronized between agent code,
+- Keep `com.csweet.video-game-creative-director` and version `3.0.0` synchronized between agent code,
   `csweet-plugin.json`, tests, and releases.
 - The root manifest is the reviewed authority request. Keep `provides`, `requires`, events,
   configuration, credentials, web access, and UI contributions synchronized with implementation
