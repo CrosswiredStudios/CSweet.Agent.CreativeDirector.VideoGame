@@ -58,9 +58,10 @@ public sealed class CreativeScopeTests
     {
         Assert.False(VideoGameCreativeDirectorAgent.ValidDesign("## Gameplay\nSome ideas"));
         Assert.True(VideoGameCreativeDirectorAgent.ValidDesign(Journey.Markdown));
+        Assert.False(VideoGameCreativeDirectorAgent.ValidDesign(string.Join("\n", VideoGameCreativeDirectorAgent.DesignSections.Select(x => "## " + x))));
     }
 
-    private sealed class Journey
+    internal sealed class Journey
     {
         public readonly Guid Manager = Guid.NewGuid(), Creative = Guid.NewGuid(), Project = Guid.NewGuid(), Team = Guid.NewGuid();
         private readonly Guid _pitch = Guid.NewGuid(), _revision = Guid.NewGuid();
@@ -70,14 +71,17 @@ public sealed class CreativeScopeTests
         public readonly VideoGameCreativeDirectorAgent Agent = new();
         public AgentRuntimeContext Context { get; }
         public bool Accepted = true;
+        public ArtifactDocument? ReviewDocument;
+        public string? ModelText;
+        public string? SystemPrompt;
         public int Models;
         public Guid? Reviewer;
         public static string Markdown => string.Join("\n", VideoGameCreativeDirectorAgent.DesignSections.Select(x => $"## {x}\nConcrete direction."));
         public Journey()
         {
             var runtime = new AgentTestRuntime()
-                .RegisterCapability<JsonElement, ArtifactDocument>(PlatformCapabilities.ArtifactRead, (_, _) => Task.FromResult(
-                    new ArtifactDocument(_pitch, "Official pitch", "video-game.vision.v1", "Approved", _revision, null, _revision, null, null,
+                .RegisterCapability<JsonElement, ArtifactDocument>(PlatformCapabilities.ArtifactRead, (r, _) => Task.FromResult(
+                    ReviewDocument is not null && r.GetProperty("artifactId").GetGuid() == ReviewDocument.Id ? ReviewDocument : new ArtifactDocument(_pitch, "Official pitch", "video-game.vision.v1", "Approved", _revision, null, _revision, null, null,
                         [new(_revision, 1, null, "Bounded game", _hash, Accepted ? "Accepted" : "Draft", DateTimeOffset.UtcNow, null, null)])))
                 .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(PlatformCapabilities.AgentOperatingStateRead,
                     (r, _) => Task.FromResult(new AgentOperatingStateReadResponse(_states.GetValueOrDefault(r.StateKey))))
@@ -85,8 +89,9 @@ public sealed class CreativeScopeTests
                     (r, _) => Task.FromResult(_states[r.StateKey] = new(Guid.NewGuid(), r.StateKey, r.SchemaId, r.SchemaVersion,
                         r.Status, r.SourceRevisions, r.ConditionCodes, r.DecisionFingerprint, r.OpenCommitmentCorrelations,
                         r.AttentionReviewId, r.Payload, 1, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)))
-                .RegisterCapability<JsonElement, JsonElement>(PlatformCapabilities.LlmChatStream, (_, _) => {
-                    Models++; return Task.FromResult(JsonSerializer.SerializeToElement(new { text = Markdown, role = "assistant" })); })
+                .RegisterCapability<JsonElement, JsonElement>(PlatformCapabilities.LlmChatStream, (r, _) => {
+                    SystemPrompt = r.GetProperty("messages")[0].GetProperty("text").GetString();
+                    Models++; return Task.FromResult(JsonSerializer.SerializeToElement(new { text = ModelText ?? Markdown, role = "assistant" })); })
                 .RegisterCapability<CreateArtifactDocument, ArtifactDocument>(PlatformCapabilities.ArtifactCreate, (r, _) => {
                     if (Documents.TryGetValue(r.IdempotencyKey, out var existing)) return Task.FromResult(existing);
                     var revision = Guid.NewGuid();
@@ -101,6 +106,16 @@ public sealed class CreativeScopeTests
         public async Task Configure() => Assert.True((await Agent.ExecuteCapabilityAsync(new(Guid.NewGuid(), AgentConfigurationCapabilities.Update,
             JsonSerializer.SerializeToElement(new UpdateAgentConfigurationRequest(new Dictionary<string,JsonElement> {
                 ["llmProviderId"] = JsonSerializer.SerializeToElement(Guid.NewGuid()), ["llmModel"] = JsonSerializer.SerializeToElement("test") }))), Context, default)).Succeeded);
+        public AgentCoordinationTurnRequest ReviewRequest()
+        {
+            var doc = ReviewDocument!; var revision = doc.Revisions.Single();
+            var request = Request();
+            var input = new CreativeReviewRequest(Project, Team, _pitch, _revision, _hash,
+                doc.Id, revision.Id, revision.ContentSha256, "Assess creative consistency");
+            return request with { Transcript = [request.Transcript[0] with { Artifact = new(
+                VideoGameCreativeDirectorAgent.CreativeReviewRequestType, "1.0", revision.ContentSha256, 1, true,
+                JsonSerializer.SerializeToElement(input, new JsonSerializerOptions(JsonSerializerDefaults.Web)), "review-request") }] };
+        }
         public AgentCoordinationTurnRequest Request() => new(Guid.NewGuid(), 1, 3, "GDD", "Develop approved game", [],
             new(Creative, Guid.NewGuid(), "Creative", "Target"), new(Manager, Guid.NewGuid(), "Director", "Initiator"), false,
             [new(Guid.NewGuid(), 0, Manager, "Continue", "Develop GDD", DateTimeOffset.UtcNow,

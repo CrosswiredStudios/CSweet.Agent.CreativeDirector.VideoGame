@@ -15,7 +15,7 @@
   },
   "id": "com.csweet.video-game-creative-director",
   "name": "Naomi Chen",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "publisher": {
     "id": "com.csweet",
     "name": "C-Sweet"
@@ -279,7 +279,7 @@
     },
     {
       "name": "agent.configuration.describe.v1",
-      "description": "Describe Video Game Video Game Director configuration.",
+      "description": "Describe Video Game Creative Director configuration.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false
@@ -293,7 +293,7 @@
     },
     {
       "name": "agent.configuration.update.v1",
-      "description": "Update Video Game Video Game Director configuration.",
+      "description": "Update Video Game Creative Director configuration.",
       "inputSchema": {
         "type": "object"
       },
@@ -334,7 +334,7 @@
     {
       "name": "platform.llm.chat-stream.v1",
       "scope": "organization",
-      "purpose": "Generate and refine grounded video-game pitches and answer creative questions."
+      "purpose": "Develop approved creative direction and independently review exact creative evidence."
     },
     {
       "name": "platform.workstream.read.v1",
@@ -359,7 +359,7 @@
     {
       "name": "communication.coordination.start.v1",
       "scope": "team",
-      "purpose": "Start authenticated exact-digest vision and Technical Director feasibility handoffs."
+      "purpose": "Collaborate with accountable peers on project-scoped creative questions."
     },
     {
       "name": "communication.coordination.respond.v1",
@@ -374,7 +374,7 @@
     {
       "name": "communication.coordination.resume.v1",
       "scope": "team",
-      "purpose": "Resume this manager's paused brief collaboration after reading an authoritative decision and relay its answer to the Producer."
+      "purpose": "Resume authorized creative coordination after required evidence or Director decisions arrive."
     },
     {
       "name": "communication.coordination.list.v1",
@@ -495,7 +495,7 @@
     {
       "name": "agent.onboarding.complete.v1",
       "scope": "organization",
-      "purpose": "Durably complete the proactive manager-involvement onboarding event."
+      "purpose": "Complete onboarding after contacting the reporting Video Game Director."
     },
     {
       "name": "platform.agent-operating-state.read.v1",
@@ -505,14 +505,17 @@
     {
       "name": "platform.agent-operating-state.write.v1",
       "scope": "organization",
-      "purpose": "Persist proposals, accepted vision, staffing, handoff, reports, escalations, and notification fingerprints."
+      "purpose": "Persist project-scoped GDD drafts, creative decisions and exact review findings."
     }
   ],
   "events": {
     "subscribes": [
       "com.csweet.agent.onboarded.v1",
       "com.csweet.user.message.received.v1",
-      "com.csweet.agent.coordination.turn-requested.v1"
+      "com.csweet.agent.coordination.turn-requested.v1",
+      "com.csweet.work.delegation.received.v1",
+      "com.csweet.work.tracking.changed.v1",
+      "com.csweet.agent.attention.review-due.v1"
     ]
   },
   "configuration": [
