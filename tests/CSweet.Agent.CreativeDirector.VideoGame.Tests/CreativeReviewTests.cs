@@ -21,6 +21,19 @@ public sealed class CreativeReviewTests
     }
 
     [Fact]
+    public async Task Accepted_review_preserves_positive_findings_without_requesting_rework()
+    {
+        var j = Fixture(); await j.Configure();
+        j.ModelText = JsonSerializer.Serialize(new CreativeReviewResult("accepted", "The approved player promise is preserved",
+            ["The explicit MVP pickups and accessibility settings are preserved"], [], false));
+        var result = await j.Agent.HandleCoordinationTurnAsync(j.ReviewRequest(), j.Context, default);
+        Assert.Equal("Continue", result.Disposition);
+        var review = result.Artifact!.Payload.GetProperty("review").Deserialize<CreativeReviewResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        Assert.Equal("accepted", review.Disposition);
+        Assert.Single(review.Findings); Assert.Empty(review.RequiredChanges); Assert.False(review.RequiresDirector);
+    }
+
+    [Fact]
     public async Task Exact_review_uses_sdk_independent_mode_and_replays_without_model_or_approval()
     {
         var j = Fixture(); await j.Configure();

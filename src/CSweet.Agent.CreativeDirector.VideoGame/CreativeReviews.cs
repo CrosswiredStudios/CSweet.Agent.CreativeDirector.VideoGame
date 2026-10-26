@@ -38,7 +38,8 @@ public sealed partial class VideoGameCreativeDirectorAgent
                 Return JSON only: {disposition, summary, findings:[string], requiredChanges:[string], requiresDirector:boolean}.
                 disposition is accepted, changes-required, or escalate. Changes-required may include requiresDirector=true
                 when concrete rework also needs the Director to resolve a boundary question; preserve both the findings and required changes. Use accepted only with concrete supporting evidence,
-                no unresolved findings and no requiredChanges. For missing evidence, name what is needed; do not invent playtests.
+                no unresolved findings and no requiredChanges. Findings may retain positive supporting observations;
+                any unresolved issue requires changes-required or escalate, never accepted. For missing evidence, name what is needed; do not invent playtests.
                 Escalate proposed changes to approved scope, platforms or budget. Technical truth and QA remain with their owners.
                 Review creative intent and consistency, never certify implementation, performance or launch readiness.
                 Match evidence requirements to the document's lifecycle stage. For a production plan, production
@@ -71,7 +72,7 @@ public sealed partial class VideoGameCreativeDirectorAgent
     internal static bool ValidReview(CreativeReviewResult? review) => review is not null &&
         !string.IsNullOrWhiteSpace(review.Summary) && review.Findings is not null && review.RequiredChanges is not null &&
         review.Findings.All(x => !string.IsNullOrWhiteSpace(x)) && review.RequiredChanges.All(x => !string.IsNullOrWhiteSpace(x)) &&
-        (review.Disposition == "accepted" ? !review.RequiresDirector && review.Findings.Count == 0 && review.RequiredChanges.Count == 0 :
+        (review.Disposition == "accepted" ? !review.RequiresDirector && review.RequiredChanges.Count == 0 :
          review.Disposition == "changes-required" ? review.RequiredChanges.Count > 0 && (!review.RequiresDirector || review.Findings.Count > 0) :
          review.Disposition == "escalate" && review.RequiresDirector && review.Findings.Count > 0);
 }
