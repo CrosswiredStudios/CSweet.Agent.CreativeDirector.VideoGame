@@ -10,6 +10,7 @@ public sealed class CreativeReviewTests
     [InlineData("accepted", true, false, false)]
     [InlineData("changes-required", false, true, true)]
     [InlineData("changes-required", false, false, false)]
+    [InlineData("changes-required", true, true, true)]
     [InlineData("escalate", true, true, true)]
     [InlineData("escalate", false, true, false)]
     public void Disposition_requires_consistent_findings(string disposition, bool director, bool findings, bool valid)
@@ -34,6 +35,21 @@ public sealed class CreativeReviewTests
         Assert.Contains("when reviewing an implemented playable", j.SystemPrompt);
         Assert.Contains("does not", j.SystemPrompt);
         Assert.Empty(j.Documents); // No authored document, CEO action or artifact acceptance grant is available.
+    }
+
+    [Fact]
+    public async Task Rework_with_a_Director_question_preserves_the_actual_findings()
+    {
+        var j = Fixture(); await j.Configure();
+        j.ModelText = JsonSerializer.Serialize(new CreativeReviewResult("changes-required", "Define the planned observation method",
+            ["Performance evidence method needs Director resolution"], ["Record a bounded observation plan"], true));
+        var result = await j.Agent.HandleCoordinationTurnAsync(j.ReviewRequest(), j.Context, default);
+        Assert.Equal("Continue", result.Disposition);
+        var review = result.Artifact!.Payload.GetProperty("review").Deserialize<CreativeReviewResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        Assert.True(review.RequiresDirector);
+        Assert.Equal("changes-required", review.Disposition);
+        Assert.Equal("Record a bounded observation plan", Assert.Single(review.RequiredChanges));
+        Assert.Empty(j.Documents);
     }
 
     [Theory]
