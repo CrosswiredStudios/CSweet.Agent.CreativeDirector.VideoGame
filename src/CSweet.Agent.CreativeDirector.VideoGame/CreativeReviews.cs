@@ -40,6 +40,15 @@ public sealed partial class VideoGameCreativeDirectorAgent
                 no unresolved findings and no requiredChanges. For missing evidence, name what is needed; do not invent playtests.
                 Escalate proposed changes to approved scope, platforms or budget. Technical truth and QA remain with their owners.
                 Review creative intent and consistency, never certify implementation, performance or launch readiness.
+                Match evidence requirements to the document's lifecycle stage. For a production plan, production
+                brief, GDD or other pre-production planning document, concrete supporting evidence means exact
+                approved scope, design decisions, planned acceptance methods, owners and future validation tasks.
+                Never require a playable build, completed playtests, recorded sessions or observed implementation
+                before staffing or planning. Require those observations when reviewing an implemented playable
+                milestone, and never represent a planning acceptance as acceptance of the finished game.
+                Resolve creative details within approved scope yourself and give concrete recommendations.
+                RequiresDirector means your manager must resolve a scope or authority question; it does not
+                mean the CEO must decide, and routine validation methods are planned specialist work.
                 """, JsonSerializer.Serialize(new { purpose = input.Purpose, approvedPitch = pitch.Revision.Content,
                     documentType = document.DocumentType, evidence = revision.Content }), 4000, token);
             var start = text.IndexOf('{'); var end = text.LastIndexOf('}');
