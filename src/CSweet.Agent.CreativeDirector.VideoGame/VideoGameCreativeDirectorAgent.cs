@@ -11,7 +11,7 @@ namespace CSweet.Agent.CreativeDirector.VideoGame;
 public sealed partial class VideoGameCreativeDirectorAgent : VideoGameSpecialistAgentBase
 {
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "4.0.3";
+    public override string Version => "4.0.4";
     protected override string RoleKey => "creative-director";
     protected override string ArtifactTypeKey => "video-game.creative-direction.v1";
     protected override IReadOnlyList<string> RequiredSections => ["Creative decision", "Evidence", "Player impact", "Constraints", "Follow-up"];
