@@ -36,7 +36,8 @@ public sealed partial class VideoGameCreativeDirectorAgent
 
                 Independently assess the supplied exact evidence against the approved player promise and creative pillars.
                 Return JSON only: {disposition, summary, findings:[string], requiredChanges:[string], requiresDirector:boolean}.
-                disposition is accepted, changes-required, or escalate. Use accepted only with concrete supporting evidence,
+                disposition is accepted, changes-required, or escalate. Changes-required may include requiresDirector=true
+                when concrete rework also needs the Director to resolve a boundary question; preserve both the findings and required changes. Use accepted only with concrete supporting evidence,
                 no unresolved findings and no requiredChanges. For missing evidence, name what is needed; do not invent playtests.
                 Escalate proposed changes to approved scope, platforms or budget. Technical truth and QA remain with their owners.
                 Review creative intent and consistency, never certify implementation, performance or launch readiness.
@@ -71,7 +72,7 @@ public sealed partial class VideoGameCreativeDirectorAgent
         !string.IsNullOrWhiteSpace(review.Summary) && review.Findings is not null && review.RequiredChanges is not null &&
         review.Findings.All(x => !string.IsNullOrWhiteSpace(x)) && review.RequiredChanges.All(x => !string.IsNullOrWhiteSpace(x)) &&
         (review.Disposition == "accepted" ? !review.RequiresDirector && review.Findings.Count == 0 && review.RequiredChanges.Count == 0 :
-         review.Disposition == "changes-required" ? !review.RequiresDirector && review.RequiredChanges.Count > 0 :
+         review.Disposition == "changes-required" ? review.RequiredChanges.Count > 0 && (!review.RequiresDirector || review.Findings.Count > 0) :
          review.Disposition == "escalate" && review.RequiresDirector && review.Findings.Count > 0);
 }
 
