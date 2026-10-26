@@ -1,11 +1,11 @@
-# Creative Director 4.0.0
+# Creative Director 4.0.1
 
 Manager-only onboarding, project-scoped GDD authorship, exact creative reviews and explicit independent author review. Uses SDK interaction modes and coordination; no CEO onboarding or hiring authority.
 
 CEO communication and material business decisions belong to the Video Game Director. Specialists preserve independent discipline evidence; no role may manufacture another role's acceptance.
 
 
-`com.csweet.video-game-creative-director` version **4.0.0** provides shared creative leadership under the Video Game Director. The Producer is a peer responsible for delivery across the game portfolio.
+`com.csweet.video-game-creative-director` version **4.0.1** provides shared creative leadership under the Video Game Director. The Producer is a peer responsible for delivery across the game portfolio.
 
 The Creative Director develops approved concepts into creative pillars, player experience, gameplay, presentation, acceptance criteria and a GDD. The Director commissions this work through `video-game.creative-design.request.v1`, bound to the exact CEO-approved pitch and project/team. Generated drafts are retained before document creation. Revision feedback stays in the same document and project, and submissions return exact revision evidence for Director review.
 

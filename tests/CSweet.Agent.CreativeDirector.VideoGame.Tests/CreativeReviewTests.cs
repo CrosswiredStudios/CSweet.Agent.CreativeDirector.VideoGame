@@ -30,6 +30,9 @@ public sealed class CreativeReviewTests
         Assert.Equal(first.Artifact!.Payload.GetRawText(), replay.Artifact!.Payload.GetRawText());
         Assert.Equal(1, j.Models);
         Assert.Contains("independent-reviewer", j.SystemPrompt);
+        Assert.Contains("Never require a playable build", j.SystemPrompt);
+        Assert.Contains("when reviewing an implemented playable", j.SystemPrompt);
+        Assert.Contains("does not", j.SystemPrompt);
         Assert.Empty(j.Documents); // No authored document, CEO action or artifact acceptance grant is available.
     }
 
