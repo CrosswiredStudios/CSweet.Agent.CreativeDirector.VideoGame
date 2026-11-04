@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CSweet.Agent.SDK;
+using CrosswiredStudios.VideoGame.ProductionReview;
 
 namespace CSweet.Agent.CreativeDirector.VideoGame.Tests;
 
@@ -24,8 +25,8 @@ public sealed class CreativeReviewTests
     public async Task Accepted_review_preserves_positive_findings_without_requesting_rework()
     {
         var j = Fixture(); await j.Configure();
-        j.ModelText = JsonSerializer.Serialize(new CreativeReviewResult("accepted", "The approved player promise is preserved",
-            ["The explicit MVP pickups and accessibility settings are preserved"], [], false));
+        j.ModelText = JsonSerializer.Serialize(WithChecklist(new CreativeReviewResult("accepted", "The approved player promise is preserved",
+            ["The explicit MVP pickups and accessibility settings are preserved"], [], false)));
         var result = await j.Agent.HandleCoordinationTurnAsync(j.ReviewRequest(), j.Context, default);
         Assert.Equal("Continue", result.Disposition);
         var review = result.Artifact!.Payload.GetProperty("review").Deserialize<CreativeReviewResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
@@ -54,8 +55,8 @@ public sealed class CreativeReviewTests
     public async Task Rework_with_a_Director_question_preserves_the_actual_findings()
     {
         var j = Fixture(); await j.Configure();
-        j.ModelText = JsonSerializer.Serialize(new CreativeReviewResult("changes-required", "Define the planned observation method",
-            ["Performance evidence method needs Director resolution"], ["Record a bounded observation plan"], true));
+        j.ModelText = JsonSerializer.Serialize(WithChecklist(new CreativeReviewResult("changes-required", "Define the planned observation method",
+            ["Performance evidence method needs Director resolution"], ["Record a bounded observation plan"], true)));
         var result = await j.Agent.HandleCoordinationTurnAsync(j.ReviewRequest(), j.Context, default);
         Assert.Equal("Continue", result.Disposition);
         var review = result.Artifact!.Payload.GetProperty("review").Deserialize<CreativeReviewResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
@@ -99,14 +100,23 @@ public sealed class CreativeReviewTests
         Assert.Contains("own GDD", result.Content); Assert.Equal(1, j.Models);
     }
 
-    private static CreativeScopeTests.Journey Fixture()
+    internal static CreativeReviewResult WithChecklist(CreativeReviewResult review)
+    {
+        var issues = review.RequiredChanges.Select((change, i) => new CreativeIssue($"creative-{i + 1}", "scope", "blocking", "open",
+            "Bounded game", "Scope section omits the required rule", "game-producer", "pre-production", change)).ToArray();
+        return review with { ChecklistVersion = CreativeChecklist.Version, Issues = issues,
+            Checklist = CreativeChecklist.CheckIds.Select(id => new CreativeCheck(id, id == "scope" && issues.Length > 0 ? "blocking" : "passed",
+                "Checked exact source and current brief")).ToArray() };
+    }
+
+    internal static CreativeScopeTests.Journey Fixture()
     {
         var j = new CreativeScopeTests.Journey(); var id = Guid.NewGuid(); var revision = Guid.NewGuid();
         j.ReviewDocument = new(id, "Production brief", "video-game.production-brief.v1", "Submitted",
             revision, revision, null, null, null,
             [new(revision, 1, null, "A single arena preserves the approved player promise.", new string('c', 64),
                 "Submitted", DateTimeOffset.UtcNow, null, null)]) { WorkstreamId = j.Project, TeamId = j.Team };
-        j.ModelText = JsonSerializer.Serialize(new CreativeReviewResult("accepted", "The arena and player promise match the pitch.", [], [], false));
+        j.ModelText = JsonSerializer.Serialize(WithChecklist(new CreativeReviewResult("accepted", "The arena and player promise match the pitch.", [], [], false)));
         return j;
     }
 }

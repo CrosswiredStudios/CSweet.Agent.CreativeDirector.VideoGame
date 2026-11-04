@@ -67,6 +67,7 @@ public sealed class CreativeScopeTests
         private readonly Guid _pitch = Guid.NewGuid(), _revision = Guid.NewGuid();
         private readonly string _hash = new('a', 64);
         private readonly Dictionary<string, AgentOperatingStateResponse> _states = [];
+        public AgentOperatingStateResponse ReviewLedger => _states.Single(x => x.Key.StartsWith("creative-review-ledger:")).Value;
         public readonly Dictionary<string, ArtifactDocument> Documents = [];
         public readonly VideoGameCreativeDirectorAgent Agent = new();
         public AgentRuntimeContext Context { get; }
@@ -74,6 +75,7 @@ public sealed class CreativeScopeTests
         public ArtifactDocument? ReviewDocument;
         public string? ModelText;
         public string? SystemPrompt;
+        public string? UserPrompt;
         public int Models;
         public Guid? Reviewer;
         public static string Markdown => string.Join("\n", VideoGameCreativeDirectorAgent.DesignSections.Select(x => $"## {x}\nConcrete direction."));
@@ -91,6 +93,7 @@ public sealed class CreativeScopeTests
                         r.AttentionReviewId, r.Payload, 1, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)))
                 .RegisterCapability<JsonElement, JsonElement>(PlatformCapabilities.LlmChatStream, (r, _) => {
                     SystemPrompt = r.GetProperty("messages")[0].GetProperty("text").GetString();
+                    UserPrompt = r.GetProperty("messages")[1].GetProperty("text").GetString();
                     Models++; return Task.FromResult(JsonSerializer.SerializeToElement(new { text = ModelText ?? Markdown, role = "assistant" })); })
                 .RegisterCapability<CreateArtifactDocument, ArtifactDocument>(PlatformCapabilities.ArtifactCreate, (r, _) => {
                     if (Documents.TryGetValue(r.IdempotencyKey, out var existing)) return Task.FromResult(existing);
@@ -108,7 +111,7 @@ public sealed class CreativeScopeTests
                 ["llmProviderId"] = JsonSerializer.SerializeToElement(Guid.NewGuid()), ["llmModel"] = JsonSerializer.SerializeToElement("test") }))), Context, default)).Succeeded);
         public AgentCoordinationTurnRequest ReviewRequest()
         {
-            var doc = ReviewDocument!; var revision = doc.Revisions.Single();
+            var doc = ReviewDocument!; var revision = doc.Revisions.Single(x => x.Id == doc.LatestRevisionId);
             var request = Request();
             var input = new CreativeReviewRequest(Project, Team, _pitch, _revision, _hash,
                 doc.Id, revision.Id, revision.ContentSha256, "Assess creative consistency");
