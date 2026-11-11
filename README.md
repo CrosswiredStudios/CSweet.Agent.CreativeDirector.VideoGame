@@ -1,4 +1,8 @@
-# Creative Director 4.1.1
+# Creative Director 4.1.2
+
+Production-brief reviews no longer fail over bookkeeping. The model supplies its judgment (checks, issues, findings, escalation); the agent derives each check's status, the required changes and the disposition from the open issues, asks for structured JSON, and sends any remaining contradiction back to the same model call with the exact reason (up to two corrections) instead of failing the turn.
+
+## Creative Director 4.1.1
 
 Uses the optional `CSweet.Agent.SDK.VideoGame.Contracts` 1.0.0 NuGet package for the shared video-game contracts instead of compiling its own `extensions/video-game/VideoGameContracts.cs` copy.
 

@@ -66,18 +66,32 @@ public sealed class CreativeChecklistTests
     }
 
     [Fact]
-    public async Task NewModelOutputNeedsEveryChecklistItemAndConsistentBlockingChanges()
+    public async Task NewModelOutputNeedsEveryChecklistItemAndABlockingQuestionForEscalation()
     {
         foreach (var review in new[] {
             new CreativeReviewResult("accepted", "No checklist", [], [], false),
             Review() with { Checklist = [] },
-            Review(Issue) with { RequiredChanges = [] },
-            Review(Issue) with { Disposition = "accepted" },
             Review(Issue with { Severity = "advisory" }) with { Disposition = "escalate", RequiresDirector = true }
         })
         {
             var j = CreativeReviewTests.Fixture(); await j.Configure(); j.ModelText = JsonSerializer.Serialize(review);
             Assert.Equal("Blocked", (await j.Agent.HandleCoordinationTurnAsync(j.ReviewRequest(), j.Context, default)).Disposition);
+        }
+    }
+
+    [Fact]
+    public async Task RequiredChangesAndDispositionAreDerivedFromOpenBlockers()
+    {
+        // The open blocking issue is the specific judgment, so it decides over a missing list or an "accepted" label.
+        foreach (var review in new[] { Review(Issue) with { RequiredChanges = [] }, Review(Issue) with { Disposition = "accepted" } })
+        {
+            var j = CreativeReviewTests.Fixture(); await j.Configure(); j.ModelText = JsonSerializer.Serialize(review);
+            var result = await j.Agent.HandleCoordinationTurnAsync(j.ReviewRequest(), j.Context, default);
+            Assert.Equal("Continue", result.Disposition);
+            var stored = result.Artifact!.Payload.GetProperty("review");
+            Assert.Equal("changes-required", stored.GetProperty("disposition").GetString());
+            Assert.Equal(Issue.Change, Assert.Single(stored.GetProperty("requiredChanges").EnumerateArray()).GetString());
+            Assert.Equal(1, j.Models);
         }
     }
 }

@@ -74,8 +74,11 @@ public sealed class CreativeScopeTests
         public bool Accepted = true;
         public ArtifactDocument? ReviewDocument;
         public string? ModelText;
+        public readonly Queue<string> ModelTexts = new(); // Served first, one per model call.
         public string? SystemPrompt;
         public string? UserPrompt;
+        public string? LastPrompt;
+        public string? SchemaName;
         public int Models;
         public Guid? Reviewer;
         public static string Markdown => string.Join("\n", VideoGameCreativeDirectorAgent.DesignSections.Select(x => $"## {x}\nConcrete direction."));
@@ -94,7 +97,11 @@ public sealed class CreativeScopeTests
                 .RegisterCapability<JsonElement, JsonElement>(PlatformCapabilities.LlmChatStream, (r, _) => {
                     SystemPrompt = r.GetProperty("messages")[0].GetProperty("text").GetString();
                     UserPrompt = r.GetProperty("messages")[1].GetProperty("text").GetString();
-                    Models++; return Task.FromResult(JsonSerializer.SerializeToElement(new { text = ModelText ?? Markdown, role = "assistant" })); })
+                    var messages = r.GetProperty("messages");
+                    LastPrompt = messages[messages.GetArrayLength() - 1].GetProperty("text").GetString();
+                    SchemaName = r.TryGetProperty("responseSchemaName", out var schema) && schema.ValueKind == JsonValueKind.String ? schema.GetString() : null;
+                    var text = ModelTexts.Count > 0 ? ModelTexts.Dequeue() : ModelText ?? Markdown;
+                    Models++; return Task.FromResult(JsonSerializer.SerializeToElement(new { text, role = "assistant" })); })
                 .RegisterCapability<CreateArtifactDocument, ArtifactDocument>(PlatformCapabilities.ArtifactCreate, (r, _) => {
                     if (Documents.TryGetValue(r.IdempotencyKey, out var existing)) return Task.FromResult(existing);
                     var revision = Guid.NewGuid();
