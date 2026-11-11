@@ -1,4 +1,12 @@
-# Creative Director 4.1.0
+# Creative Director 4.1.2
+
+Production-brief reviews no longer fail over bookkeeping. The model supplies its judgment (checks, issues, findings, escalation); the agent derives each check's status, the required changes and the disposition from the open issues, asks for structured JSON, and sends any remaining contradiction back to the same model call with the exact reason (up to two corrections) instead of failing the turn.
+
+## Creative Director 4.1.1
+
+Uses the optional `CSweet.Agent.SDK.VideoGame.Contracts` 1.0.0 NuGet package for the shared video-game contracts instead of compiling its own `extensions/video-game/VideoGameContracts.cs` copy.
+
+## Creative Director 4.1.0
 
 Production-brief reviews use the versioned `production-brief.v1` checklist: scope, player loop, controls/accessibility, presentation/audio, validation plan, and constraints/non-goals. Each finding records a stable ID, blocking/advisory severity, current evidence, approved requirement, owner, milestone and corrective action. Every prior blocker, including its resolution, must remain accounted for across revisions. Advisory-only observations permit planning acceptance; missing checklist entries or contradictory verdicts fail review.
 

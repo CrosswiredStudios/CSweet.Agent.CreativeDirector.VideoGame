@@ -11,7 +11,7 @@ namespace CSweet.Agent.CreativeDirector.VideoGame;
 public sealed partial class VideoGameCreativeDirectorAgent : VideoGameSpecialistAgentBase
 {
     public override string AgentId => "com.csweet.video-game-creative-director";
-    public override string Version => "4.1.0";
+    public override string Version => "4.1.2";
     protected override string RoleKey => "creative-director";
     protected override string ArtifactTypeKey => "video-game.creative-direction.v1";
     protected override IReadOnlyList<string> RequiredSections => ["Creative decision", "Evidence", "Player impact", "Constraints", "Follow-up"];
@@ -162,6 +162,15 @@ public sealed partial class VideoGameCreativeDirectorAgent : VideoGameSpecialist
     private async Task<string> ModelAsync(AgentRuntimeContext context, string operation, string system, string input,
         int maxTokens, CancellationToken token)
     {
+        var (client, instructions) = CreateModel(context, operation, system);
+        var response = await client.GetResponseAsync([new(ChatRole.System, instructions), new(ChatRole.User, input)],
+            new ChatOptions { MaxOutputTokens = maxTokens }, token);
+        if (string.IsNullOrWhiteSpace(response.Text)) throw new InvalidOperationException("The creative model returned no usable content.");
+        return response.Text.Trim();
+    }
+
+    private (IChatClient Client, string Instructions) CreateModel(AgentRuntimeContext context, string operation, string system)
+    {
         var provider = Settings.GetGuid("llmProviderId") ?? throw new InvalidOperationException("Configure the Creative Director model.");
         var client = context.CreateChatClient(new AgentLlmSelection(provider, Settings.GetString("llmModel"), new(null, null, operation)));
         var mode = operation == "creative-review" ? AgentInteractionModes.IndependentReviewer : AgentInteractionModes.SupportingSpecialist;
@@ -170,10 +179,7 @@ public sealed partial class VideoGameCreativeDirectorAgent : VideoGameSpecialist
             ["creative-direction", "player-experience", "creative-review"],
             operation == "creative-review" ? AgentInteractionResponseContracts.ReviewOutcome : AgentInteractionResponseContracts.DeliverableOrClarification)
             { CounterpartRoleKey = "game-director" });
-        var response = await client.GetResponseAsync([new(ChatRole.System, instructions), new(ChatRole.User, input)],
-            new ChatOptions { MaxOutputTokens = maxTokens }, token);
-        if (string.IsNullOrWhiteSpace(response.Text)) throw new InvalidOperationException("The creative model returned no usable content.");
-        return response.Text.Trim();
+        return (client, instructions);
     }
 }
 

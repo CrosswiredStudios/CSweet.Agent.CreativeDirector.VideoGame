@@ -44,52 +44,20 @@ public sealed partial class VideoGameCreativeDirectorAgent
         var stored = await context.Platform.ReadOperatingStateAsync<CreativeReviewResult>(key, token);
         if (stored is null)
         {
-            var text = await ModelAsync(context, "creative-review", CreativePrompt + """
-
-                Independently assess the supplied exact evidence against the approved player promise and creative pillars.
-                Return JSON only: {disposition, summary, findings:[string], requiredChanges:[string], requiresDirector:boolean}.
-                disposition is accepted, changes-required, or escalate. Changes-required may include requiresDirector=true
-                when concrete rework also needs the Director to resolve a boundary question; preserve both the findings and required changes. Use accepted only with concrete supporting evidence,
-                no open blocking issues and no requiredChanges. Findings may retain positive or advisory observations;
-                an unresolved blocking issue requires changes-required or escalate. For missing evidence, name what is needed; do not invent playtests.
-                Escalate proposed changes to approved scope, platforms or budget. Technical truth and QA remain with their owners.
-                Review creative intent and consistency, never certify implementation, performance or launch readiness.
-                Match evidence requirements to the document's lifecycle stage. For a production plan, production
-                brief, GDD or other pre-production planning document, concrete supporting evidence means exact
-                approved scope, design decisions, planned acceptance methods, owners and future validation tasks.
-                Never require a playable build, completed playtests, recorded sessions or observed implementation
-                before staffing or planning. Require those observations when reviewing an implemented playable
-                milestone, and never represent a planning acceptance as acceptance of the finished game.
-                Resolve creative details within approved scope yourself and give concrete recommendations.
-                RequiresDirector means your manager must resolve a scope or authority question; it does not
-                mean the CEO must decide, and routine validation methods are planned specialist work.
-
-                Complete this fixed checklist in every review: scope, player-loop, controls-accessibility,
-                presentation-audio, validation-plan, constraints-non-goals. Return checklistVersion="production-brief.v1",
-                checklist:[{id,status,evidence}] with one entry for every ID. Status is passed, blocking, advisory,
-                or not-applicable. Assess the whole checklist on the first pass; on revision check the changed
-                content and previous findings. Do not reopen a recorded resolution without a cited conflict.
-                Return issues:[{id,checkId,severity,status,requirement,evidence,owner,milestone,change}].
-                IDs persist across revisions. Severity is blocking or advisory; status is open or resolved.
-                Requirement cites the approved requirement or exact Director resolution; evidence names the
-                current document section and observed conflict, omission, or resolution. Owner is the role
-                responsible and milestone is when the requirement must be satisfied. Preserve EVERY previous
-                blocking issue with the same ID, checkId and requirement, including its evidenced resolution.
-                Never downgrade or silently drop a blocker. A newly discovered blocker must cite an approved
-                requirement or a new risk in changed content; explain why it was not raised in the previous pass.
-                Planning can assign later tuning/validation to a named role and milestone. Recommendations,
-                optional polish and adequately owned future work are advisory and do not block staffing.
-                requiredChanges contains exactly the change of every OPEN BLOCKING issue in issue order.
-                Advisory-only reviews are accepted with observations. Unresolved blocking issues require
-                changes-required or escalate. Do not invent a new acceptance gate or numerical threshold.
-                """, JsonSerializer.Serialize(new { purpose = input.Purpose, approvedPitch = pitch.Revision.Content,
-                    approvedGdd = sourceEvidence?.Gdd.Content, documentType = document.DocumentType,
-                    evidence = ProductionSources.WorkingBrief(revision.Content), previousReview = prior }), 6000, token);
-            var start = text.IndexOf('{'); var end = text.LastIndexOf('}');
-            var result = start >= 0 && end >= start ? JsonSerializer.Deserialize<CreativeReviewResult>(text[start..(end + 1)], Json) : null;
-            if (!ValidReview(result) || result!.ChecklistVersion != CreativeChecklist.Version ||
-                !CreativeChecklist.Valid(result.Checklist, result.Issues, prior?.Issues))
+            CreativeReviewResult result;
+            try
+            {
+                result = await ReviewModelAsync(context, CreativePrompt + CreativeReviewModel.Instructions,
+                    JsonSerializer.Serialize(new { purpose = input.Purpose, approvedPitch = pitch.Revision.Content,
+                        approvedGdd = sourceEvidence?.Gdd.Content, documentType = document.DocumentType,
+                        evidence = ProductionSources.WorkingBrief(revision.Content), previousReview = prior }), prior?.Issues, token);
+            }
+            catch (CreativeReviewContractException)
+            {
+                // Kept verbatim: the Director's bounded retry recognizes exactly this text. The specific reason is
+                // in the correction requests recorded on this agent's model calls.
                 return AgentCoordinationTurnResult.Blocked("Creative review did not return actionable, consistent findings.");
+            }
             stored = await new RevisionSafeProjectState(context.Platform).MergeAsync<CreativeReviewResult>(key,
                 "video-game.creative-review.v1", 1, prior => prior ?? result!,
                 new Dictionary<string, string> { ["evidence"] = input.Sha256, ["pitch"] = input.PitchSha256 }, key, token);
