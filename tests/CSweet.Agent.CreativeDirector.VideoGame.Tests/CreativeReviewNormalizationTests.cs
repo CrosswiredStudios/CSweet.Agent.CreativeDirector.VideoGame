@@ -128,7 +128,10 @@ public sealed class CreativeReviewNormalizationTests
         Assert.Contains("pb-validation-owners-v1 is missing", Assert.Throws<CreativeReviewContractException>(() => Normalize(dropped, previous)).Message);
         var downgraded = Attempt1 with { Issues = Attempt1.Issues.Select(x => x.Severity == "blocking" ? x with { Severity = "advisory" } : x).ToArray() };
         Assert.Contains("must keep checkId", Assert.Throws<CreativeReviewContractException>(() => Normalize(downgraded, previous)).Message);
-        var resolved = Attempt1 with { Issues = Attempt1.Issues.Select(x => x.Severity == "blocking" ? x with { Status = "resolved" } : x).ToArray() };
+        var resolved = Attempt1 with {
+            Issues = Attempt1.Issues.Select(x => x.Severity == "blocking" ? x with { Status = "resolved" } : x).ToArray(),
+            Checklist = Attempt1.Checklist.Select(x => x.Id == "validation-plan" ? x with { Status = "passed" } : x).ToArray()
+        };
         Assert.Equal("accepted", Normalize(resolved, previous).Disposition);
     }
 

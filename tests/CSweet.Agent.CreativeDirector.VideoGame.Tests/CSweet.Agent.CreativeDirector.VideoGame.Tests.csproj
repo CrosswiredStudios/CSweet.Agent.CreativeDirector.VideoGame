@@ -12,5 +12,6 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
+    <None Update="Fixtures/**/*.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

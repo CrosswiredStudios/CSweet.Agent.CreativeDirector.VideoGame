@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CSweet.Agent.SDK;
+using CSweet.Agent.SDK.VideoGame.Contracts;
 
 namespace CSweet.Agent.CreativeDirector.VideoGame.Tests;
 
@@ -54,11 +55,14 @@ public sealed class CreativeScopeTests
     }
 
     [Fact]
-    public void Incomplete_creative_output_is_not_a_submittable_gdd()
+    public async Task Substantive_completeness_is_left_to_independent_review_not_a_heading_gate()
     {
-        Assert.False(VideoGameCreativeDirectorAgent.ValidDesign("## Gameplay\nSome ideas"));
-        Assert.True(VideoGameCreativeDirectorAgent.ValidDesign(Journey.Markdown));
-        Assert.False(VideoGameCreativeDirectorAgent.ValidDesign(string.Join("\n", VideoGameCreativeDirectorAgent.DesignSections.Select(x => "## " + x))));
+        var j = new Journey { ModelText = "Gameplay: some ideas that still need independent review." };
+        await j.Configure();
+        var result = await j.Agent.HandleCoordinationTurnAsync(j.Request(),j.Context,default);
+        Assert.Equal("Continue",result.Disposition);
+        Assert.Equal(j.Manager,j.Reviewer);
+        Assert.Equal(j.ModelText,j.Documents.Values.Single().Revisions[0].Content);
     }
 
     internal sealed class Journey
@@ -80,14 +84,18 @@ public sealed class CreativeScopeTests
         public string? LastPrompt;
         public string? SchemaName;
         public int Models;
+        public int RevisionWrites, Submissions;
+        public string? FinishReason;
+        public readonly List<JsonElement> ModelRequests = [];
         public Guid? Reviewer;
-        public static string Markdown => string.Join("\n", VideoGameCreativeDirectorAgent.DesignSections.Select(x => $"## {x}\nConcrete direction."));
+        public static string Markdown => string.Join("\n", new[] {"Creative pillars","Player experience","Gameplay","Presentation","Acceptance criteria","Constraints","Open questions"}.Select(x => $"## {x}\nConcrete direction."));
         public Journey()
         {
             var runtime = new AgentTestRuntime()
                 .RegisterCapability<JsonElement, ArtifactDocument>(PlatformCapabilities.ArtifactRead, (r, _) => Task.FromResult(
-                    ReviewDocument is not null && r.GetProperty("artifactId").GetGuid() == ReviewDocument.Id ? ReviewDocument : new ArtifactDocument(_pitch, "Official pitch", "video-game.vision.v1", "Approved", _revision, null, _revision, null, null,
-                        [new(_revision, 1, null, "Bounded game", _hash, Accepted ? "Accepted" : "Draft", DateTimeOffset.UtcNow, null, null)])))
+                    Documents.Values.FirstOrDefault(x => x.Id == r.GetProperty("artifactId").GetGuid()) ??
+                    (ReviewDocument is not null && r.GetProperty("artifactId").GetGuid() == ReviewDocument.Id ? ReviewDocument : new ArtifactDocument(_pitch, "Official pitch", "video-game.vision.v1", "Approved", _revision, null, _revision, null, null,
+                        [new(_revision, 1, null, "Bounded game", _hash, Accepted ? "Accepted" : "Draft", DateTimeOffset.UtcNow, null, null)]))))
                 .RegisterCapability<AgentOperatingStateReadRequest, AgentOperatingStateReadResponse>(PlatformCapabilities.AgentOperatingStateRead,
                     (r, _) => Task.FromResult(new AgentOperatingStateReadResponse(_states.GetValueOrDefault(r.StateKey))))
                 .RegisterCapability<AgentOperatingStateWriteRequest, AgentOperatingStateResponse>(PlatformCapabilities.AgentOperatingStateWrite,
@@ -95,13 +103,14 @@ public sealed class CreativeScopeTests
                         r.Status, r.SourceRevisions, r.ConditionCodes, r.DecisionFingerprint, r.OpenCommitmentCorrelations,
                         r.AttentionReviewId, r.Payload, 1, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)))
                 .RegisterCapability<JsonElement, JsonElement>(PlatformCapabilities.LlmChatStream, (r, _) => {
+                    ModelRequests.Add(r.Clone());
                     SystemPrompt = r.GetProperty("messages")[0].GetProperty("text").GetString();
                     UserPrompt = r.GetProperty("messages")[1].GetProperty("text").GetString();
                     var messages = r.GetProperty("messages");
                     LastPrompt = messages[messages.GetArrayLength() - 1].GetProperty("text").GetString();
                     SchemaName = r.TryGetProperty("responseSchemaName", out var schema) && schema.ValueKind == JsonValueKind.String ? schema.GetString() : null;
                     var text = ModelTexts.Count > 0 ? ModelTexts.Dequeue() : ModelText ?? Markdown;
-                    Models++; return Task.FromResult(JsonSerializer.SerializeToElement(new { text, role = "assistant" })); })
+                    Models++; return Task.FromResult(JsonSerializer.SerializeToElement(new { text, role = "assistant", finishReason = FinishReason })); })
                 .RegisterCapability<CreateArtifactDocument, ArtifactDocument>(PlatformCapabilities.ArtifactCreate, (r, _) => {
                     if (Documents.TryGetValue(r.IdempotencyKey, out var existing)) return Task.FromResult(existing);
                     var revision = Guid.NewGuid();
@@ -109,8 +118,15 @@ public sealed class CreativeScopeTests
                         [new(revision, 1, null, r.Content, new string('b', 64), "Draft", DateTimeOffset.UtcNow, null, null)])
                         { WorkstreamId = r.WorkstreamId, TeamId = r.TeamId };
                     Documents.Add(r.IdempotencyKey, doc); return Task.FromResult(doc); })
+                .RegisterCapability<CreateArtifactRevision, ArtifactRevision>(PlatformCapabilities.ArtifactRevise, (r, _) => {
+                    RevisionWrites++;
+                    var entry = Documents.Single(x => x.Value.Id == r.ArtifactId);
+                    var revision = new ArtifactRevision(Guid.NewGuid(), 2, r.ExpectedBaseRevisionId, r.Content,
+                        new string('c',64), "Draft", DateTimeOffset.UtcNow, null, null);
+                    Documents[entry.Key] = entry.Value with { LatestRevisionId = revision.Id, Revisions = [..entry.Value.Revisions, revision] };
+                    return Task.FromResult(revision); })
                 .RegisterCapability<SubmitArtifactRevision, ArtifactDocument>(PlatformCapabilities.ArtifactSubmit, (r, _) => {
-                    Reviewer = r.ReviewerOrganizationUserId; return Task.FromResult(Documents.Values.Single(x => x.Id == r.ArtifactId)); });
+                    Submissions++; Reviewer = r.ReviewerOrganizationUserId; return Task.FromResult(Documents.Values.Single(x => x.Id == r.ArtifactId)); });
             Context = runtime.CreateContext(identity: new(Creative.ToString(), "Creative", null, "Creative Director", null, [], null, Manager.ToString(), "Video Game Director"));
         }
         public async Task Configure() => Assert.True((await Agent.ExecuteCapabilityAsync(new(Guid.NewGuid(), AgentConfigurationCapabilities.Update,
@@ -130,7 +146,7 @@ public sealed class CreativeScopeTests
             new(Creative, Guid.NewGuid(), "Creative", "Target"), new(Manager, Guid.NewGuid(), "Director", "Initiator"), false,
             [new(Guid.NewGuid(), 0, Manager, "Continue", "Develop GDD", DateTimeOffset.UtcNow,
                 new(VideoGameCreativeDirectorAgent.DesignRequestType, "1.0", _hash, 1, true,
-                    JsonSerializer.SerializeToElement(new CreativeDesignRequest(Project, Team, Manager, Creative, Guid.NewGuid(), _pitch, _revision, _hash), new JsonSerializerOptions(JsonSerializerDefaults.Web)), "request-digest"))])
+                    JsonSerializer.SerializeToElement(new GameCreativeDesignRequestV1(Project, Team, Manager, Creative, Guid.NewGuid(), _pitch, _revision, _hash), new JsonSerializerOptions(JsonSerializerDefaults.Web)), "request-digest"))])
             { WorkContext = new(Guid.NewGuid(), Project, Team, null, null, null, null, Guid.NewGuid(), null, null) };
     }
 }

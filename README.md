@@ -1,4 +1,8 @@
-# Creative Director 4.1.2
+# Creative Director 4.1.4
+
+GDD drafts can use any clear document structure. The Director independently assesses substantive coverage against the approved pitch and returns exact revision feedback for real gaps; headings, labels, ordering and document length are not acceptance gates. Naomi retries empty or truncated generation once, retains its evidence across duplicate delivery, and reports exhausted generation through a typed failure artifact. Uses shared GDD wire contracts from `CSweet.Agent.SDK.VideoGame.Contracts` 1.1.0 with Director 0.6.9. Publish the contracts package first, then update both agents through published releases and Installed Agents.
+
+## Creative Director 4.1.2
 
 Production-brief reviews no longer fail over bookkeeping. The model supplies its judgment (checks, issues, findings, escalation); the agent derives each check's status, the required changes and the disposition from the open issues, asks for structured JSON, and sends any remaining contradiction back to the same model call with the exact reason (up to two corrections) instead of failing the turn.
 
@@ -17,7 +21,7 @@ Manager-only onboarding, project-scoped GDD authorship, exact creative reviews a
 CEO communication and material business decisions belong to the Video Game Director. Specialists preserve independent discipline evidence; no role may manufacture another role's acceptance.
 
 
-`com.csweet.video-game-creative-director` version **4.1.0** provides shared creative leadership under the Video Game Director. The Producer is a peer responsible for delivery across the game portfolio.
+`com.csweet.video-game-creative-director` version **4.1.4** provides shared creative leadership under the Video Game Director. The Producer is a peer responsible for delivery across the game portfolio.
 
 The Creative Director develops approved concepts into creative pillars, player experience, gameplay, presentation, acceptance criteria and a GDD. The Director commissions this work through `video-game.creative-design.request.v1`, bound to the exact CEO-approved pitch and project/team. Generated drafts are retained before document creation. Revision feedback stays in the same document and project, and submissions return exact revision evidence for Director review.
 
